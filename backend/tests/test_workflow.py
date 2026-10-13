@@ -323,6 +323,28 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         r = await self.client.post(f"/api/projects/{self.pid}/jobs",json={"kind":"export"})
         j = await self.wait_job(r.json()["id"],"failed")
         self.assertIn("will not cut off dialogue",j["message"])
+        self.assertIn("Line 1 (Speaker 01, 0.50s)",j["message"])
+        self.assertIn("0.80s speech at 1.00× / 0.10s slot (+0.70s)",j["message"])
+        root=self.app.state.store.project_dir(self.pid)
+        self.assertFalse(list(root.glob("*_mixclip_*.wav")))
+        # Filtering muted speakers must preserve the editor's line numbers.
+        second={**self.p["speakers"][0],"id":"speaker-2","name":"Other actor","muted":False}
+        self.p["speakers"][0]["muted"]=True
+        self.p["speakers"].append(second)
+        self.p["dialogue"][1].update(speaker="speaker-2",end=2.1)
+        await self.patch(dialogue=self.p["dialogue"],speakers=self.p["speakers"])
+        r=await self.client.post(f"/api/projects/{self.pid}/jobs",json={"kind":"export"})
+        j=await self.wait_job(r.json()["id"],"failed")
+        self.assertIn("Line 2 (Other actor, 2.00s)",j["message"])
+        self.assertNotIn("Line 1",j["message"])
+        self.assertFalse(list(root.glob("*_mixclip_*.wav")))
+        # Explicitly extending a free slot retains the take and permits a real render.
+        asset=self.p["dialogue"][1]["audio"]["asset"]
+        self.p["dialogue"][1].update(source_start=2,source_end=2.1,end=2.8)
+        await self.patch(dialogue=self.p["dialogue"])
+        await self.run_job("export")
+        self.assertEqual(self.p["dialogue"][1]["audio"]["asset"],asset)
+        self.assertEqual(self.p["dialogue"][1]["source_end"],2.1)
 
     async def test_custom_worker_protocol_and_cancel(self):
         await self.upload("media",self.video)

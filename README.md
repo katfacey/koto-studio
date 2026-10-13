@@ -115,7 +115,13 @@ use English word count, punctuation and the adjustable words-per-minute pace; th
 are hints, not predictions from the selected TTS model. Generate measures the actual
 take. Automatic fit can adjust speed within 0.80–1.25×. Manual speech speed overrides
 auto-fit for that clip; preview and export apply it without overwriting the take.
-Export rejects speech that still exceeds its slot instead of cutting it off.
+Export lists missing or overlong unmuted takes before rendering, with **Review clip**
+to jump to the affected line. **Fit with speech speed** enables modest auto-fit when
+possible. Otherwise **Extend slot** keeps the take and original reference timestamps,
+and extends only into a free gap within the video. This changes the English timing;
+review it against the picture. When there is no room, shorten the adaptation and
+regenerate, or adjust the clip manually. Export probes every take before mixing and
+reports line number, speaker, start time and the exact excess; it never cuts off speech.
 
 **Suggest alternatives** runs the selected local translation model for one clip.
 It proposes concise, near-target and fuller phrasings; it leaves your adaptation

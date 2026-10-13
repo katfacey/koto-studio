@@ -525,18 +525,30 @@ class Jobs:
             bed = None
         if mode == "separated" and not bed and not bed_muted:
             raise ValueError("Separate audio first, or choose Silence / Original mix in Export settings")
+        # Probe every take before normalization so a late failure wastes no render work.
+        rates, issues = {}, []
+        speakers = {s["id"]: s["name"] for s in project["speakers"]}
+        for index,line in enumerate(all_lines):
+            if line["speaker"] in muted:
+                continue
+            self.check(jid)
+            audio = line["audio"]
+            if audio.get("kind")=="generated" and audio.get("signature") != signature(project,line):
+                raise ValueError(f"Line {index+1} has an out-of-date voice take. Regenerate the changed line.")
+            target = line["end"]-line["start"]
+            actual = probe(self.store.asset(project["id"],audio["asset"]))["duration"]
+            rate = playback_rate(project,line,actual)
+            rates[line["id"]] = rate
+            if actual/rate > target+0.08:
+                issues.append(f"Line {index+1} ({speakers.get(line['speaker'],line['speaker'])}, {line['start']:.2f}s) exceeds its slot: {actual/rate:.2f}s speech at {rate:.2f}× / {target:.2f}s slot (+{actual/rate-target:.2f}s).")
+        if issues:
+            raise ValueError(" ".join(issues)+" Open Export to review the affected clips, fit speed or extend into a free gap; otherwise shorten the English wording and regenerate. Export will not cut off dialogue.")
         self.progress(jid,0.05,"Preparing synchronized dialogue clips")
         clips = []
         for i,line in enumerate(lines):
             self.check(jid)
             audio = line["audio"]
-            if audio.get("kind")=="generated" and audio.get("signature") != signature(project,line):
-                raise ValueError("A voice take is out of date. Regenerate the changed line.")
-            target = line["end"]-line["start"]
-            actual = probe(self.store.asset(project["id"],audio["asset"]))["duration"]
-            rate = playback_rate(project,line,actual)
-            if actual/rate > target+0.08:
-                raise ValueError(f"Line {i+1} exceeds its slot. Edit wording or extend its timing; export will not cut off dialogue.")
+            rate = rates[line["id"]]
             normalized = root / f"{jid[:8]}_mixclip_{i}.wav"
             filters = atempo_factor(rate) if abs(rate-1)>.001 else "anull"
             self.ffmpeg(jid,root,"-i",self.store.asset(project["id"],audio["asset"]),"-af",filters,"-ar","48000","-ac","2",normalized)

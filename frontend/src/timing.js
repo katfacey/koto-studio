@@ -16,3 +16,20 @@ export function timingInfo(p,l,text=l.translation){
   const label=!seconds?'No English text':`${measured?'Take':'Estimate'} ${seconds.toFixed(1)}s / ${target.toFixed(1)}s slot${Math.abs(rate-1)>.01?` · ${rate.toFixed(2)}×`:''}${status==='long'?' · may run long':status==='short'?' · may run short':''}`;
   return {seconds,target,rate,played,status,label,measured};
 }
+
+// Offer an explicit fix; never shift another clip or discard the original take.
+export function timingFix(p,l){
+  const t=timingInfo(p,l);
+  if(!t.measured||t.status!=='long')return null;
+  const factor=t.seconds/t.target;
+  if(factor>=.8&&factor<=1.25)return {kind:'speed',label:'Fit with speech speed',rate:factor};
+  const end=Math.ceil((l.start+t.played)*1000)/1000;
+  if(!p.media||end>p.media.duration)return {reason:'No room before the video ends. Shorten the wording and regenerate.'};
+  const muted=new Set(p.speakers.filter(s=>s.muted).map(s=>s.id));
+  if(p.dialogue.some(other=>other.id!==l.id&&!muted.has(other.speaker)&&other.end>l.end&&other.start<end))return {reason:'Extension would overlap another voice clip. Adjust speed or shorten the wording and regenerate.'};
+  return {kind:'extend',label:`Extend slot to ${(end-l.start).toFixed(2)}s`,end};
+}
+export function exportIssues(p){
+  const muted=new Set(p.speakers.filter(s=>s.muted).map(s=>s.id));
+  return p.dialogue.flatMap((l,index)=>muted.has(l.speaker)?[]:!l.audio?[{line:l,index,reason:'No replacement voice take'}]:timingInfo(p,l).status==='long'?[{line:l,index,reason:timingInfo(p,l).label}]:[]);
+}

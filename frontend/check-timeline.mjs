@@ -23,3 +23,15 @@ delete l.audio;l.translation='One two three four five six seven eight nine ten e
 l.translation='Wait.';assert.equal(timingInfo(p,l).status,'short');
 l.audio={duration:2.2,asset:'take'};assert.equal(playbackRate(p,l,2.2),1.1);l.auto_fit=false;l.playback_rate=.9;assert.equal(playbackRate(p,l,2.2),.9);assert.equal(timingInfo(p,l).status,'long');
 console.log('Timing checks passed: estimates, short/long hints, measured takes and reversible manual/automatic speed.');
+
+const {timingFix,exportIssues}=await import('./src/timing.js');
+p=fixture();l=p.dialogue[0];l.audio.duration=2.4;l.auto_fit=false;
+assert.equal(timingFix(p,l).kind,'speed');assert.equal(timingFix(p,l).rate,1.2);
+l.audio.duration=2.8;assert.equal(timingFix(p,l).end,4.8);
+l.audio.duration=4;assert.match(timingFix(p,l).reason,/overlap/);
+p.speakers[1].muted=true;assert.equal(timingFix(p,l).end,6);
+l.audio.duration=19;assert.match(timingFix(p,l).reason,/video ends/);
+l.audio.duration=2.8;delete p.dialogue[1].audio;
+assert.deepEqual(exportIssues(p).map(x=>x.index),[0]);p.speakers[1].muted=false;
+assert.deepEqual(exportIssues(p).map(x=>x.index),[0,1]);
+console.log('Export timing checks passed: speed fit, safe extension, overlaps, video bounds and muted/missing clips.');

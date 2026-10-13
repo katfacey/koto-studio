@@ -162,6 +162,23 @@ def main():
                         page.wait_for_function('window.kotoAudio.some(a=>!a.paused)')
                         page.locator('[data-act="play"]').click()
                         page.wait_for_function('window.kotoAudio.every(a=>a.paused)');save()
+                        # A measured long take appears before render and can be fitted without regeneration.
+                        original_line=project()['dialogue'][0]
+                        page.locator('[data-act="timeline-tab"]').click()
+                        page.locator('[data-field="line.end"]').fill(str(original_line['start']+1.7))
+                        page.locator('[data-field="line.auto_fit"]').uncheck();save()
+                        page.locator('[data-act="export"]').click()
+                        issue=page.locator('.export-issue').filter(has=page.locator(f'[data-act="review-timing"][data-id="{clip_id}"]'))
+                        assert 'Take 2.0s / 1.7s slot' in issue.inner_text()
+                        issue.locator('[data-act="review-timing"]').click()
+                        page.locator('[data-act="fix-timing"]').click();save()
+                        fitted=project()['dialogue'][0]
+                        assert fitted['auto_fit'] and fitted['audio']['asset']==original_line['audio']['asset']
+                        assert fitted['source_end']==original_line['source_end']
+                        page.locator('[data-act="export"]').click()
+                        assert page.locator(f'.export-issue [data-id="{clip_id}"]').count()==0
+                        page.locator('[data-act="close-modal"]').click()
+                        page.locator('[data-field="line.end"]').fill(str(original_line['end']));save()
                         page.locator(f'.speaker-card[data-id="{second}"]').click()
                         # Autosave uses the real PATCH endpoint, including typing during a delayed response.
                         page.locator('[data-field="line.translation"]').fill('Please wait here.')
@@ -235,7 +252,7 @@ def main():
                         print('Browser diagnostic:', page.evaluate("({url:location.href,tracks:Array.from(document.querySelectorAll('[data-track]')).map(n=>({class:n.className,track:n.dataset.track,id:n.dataset.id})),errors:document.querySelector('.error-toast')?.textContent})"))
                         raise
                     browser.close()
-                print('Real Chromium checks passed: panel resizing, clip reassignment and retiming, lane ordering, mutes, visibility, original-reference selection, timing hints and suggestion selection, real live audio/mutes, autosave typing/trim races, real Piper generation/batching, English-mix completion, keyboard delete/undo, persistence, and Cancel X.')
+                print('Real Chromium checks passed: panel resizing, clip reassignment and retiming, lane ordering, mutes, visibility, original-reference selection, export timing preflight/fix, timing hints and suggestion selection, real live audio/mutes, autosave typing/trim races, real Piper generation/batching, English-mix completion, keyboard delete/undo, persistence, and Cancel X.')
             finally:
                 if server.poll() is None:
                     server.terminate()
