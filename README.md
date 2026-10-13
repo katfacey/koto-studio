@@ -6,7 +6,7 @@ model environments, and optional local translation runtime inside the app folder
 
 **[Download the complete ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)**
 
-[Windows validation runs](https://github.com/katfacey/koto-studio/actions) check bootstrap, real speech workers, HTTP/media output and Chromium editor controls with only Windows System32 on PATH.
+[Windows validation passed](https://github.com/katfacey/koto-studio/actions/runs/38400902123): 32 backend tests, real Piper and XTTS speech, moved-folder worker repair, and Chromium timeline/voice/playback checks with only Windows System32 on PATH.
 
 ## Standalone installation
 
@@ -171,7 +171,7 @@ workers by importing subtitles and replacement takes.
 | Default dubbing workers | Demucs, Pyannote package, Faster Whisper, Piper + English voice | Gated diarization pipeline still needs provisioning; recognition/separation weights download on first use. |
 | XTTS | Reference-conditioned voice worker | Run Install-Reference-Voices.cmd; use original dialogue references or upload a clean sample. |
 | Local translation | Private Ollama + Qwen3 14B | No system Ollama service needed. |
-| All | All workers and local translation | Still provision gated/XTTS checkpoint files as needed. |
+| All | All workers and local translation | Accept gated diarization access and run its weight setup separately. |
 | Speaker diarization weights | Audio worker plus local pyannote pipeline/weights | Accept Hugging Face access agreements and enter a read token locally. |
 
 ### Set up speaker diarization
@@ -291,3 +291,5 @@ mixing, a signed installer, or hosted model processing. Subtitles match by time
 overlap; dedicated forced alignment and automatic translation repair loops remain
 later work. Custom model adapters, including RVC/UVR bridges, use the protocol in
 [models/README.md](models/README.md).
+
+The latest actual Windows editor screenshot is available in the [validation artifact](https://github.com/katfacey/koto-studio/actions/runs/38400902123/artifacts/11815935324). It uses the labeled sample project and a test-only PCM take; GPU voice similarity must be evaluated on the target PC.
