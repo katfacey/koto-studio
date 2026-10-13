@@ -46,6 +46,8 @@ class Jobs:
         if kind not in {*CAPABILITIES, "prepare", "export", "reference", "alternatives"}:
             raise ValueError("Unknown job type")
         project = self.store.get(pid)
+        if kind=="synthesize" and (options or {}).get("speaker_id") and not any(s["id"]==(options or {})["speaker_id"] for s in project["speakers"]):
+            raise ValueError("Unknown speaker for synthesis")
         if not project["media"] and kind in ("prepare","separate","transcribe","diarize","export"):
             raise ValueError("Import source media first")
         if kind == "prepare":
@@ -66,7 +68,7 @@ class Jobs:
                 require_pipeline(project["models"][cap].get("settings"))
             if kind == "synthesize":
                 selected = (options or {}).get("line_ids")
-                ids = {l["speaker"] for l in project["dialogue"] if not selected or l["id"] in selected}
+                ids = {l["speaker"] for l in project["dialogue"] if l.get("translation","").strip() and (not selected or l["id"] in selected) and (not (options or {}).get("speaker_id") or l["speaker"]==options["speaker_id"])}
                 for speaker in project["speakers"]:
                     if speaker["id"] not in ids:
                         continue
@@ -115,7 +117,7 @@ class Jobs:
         self.check(jid)
         self.store.job_update(jid, progress=value, message=message[:1000])
 
-    def command(self, jid, args, log, progress_base=0, progress_span=1, duration=None, message="Processing media"):
+    def command(self, jid, args, log, progress_base=0, progress_span=1, duration=None, message="Processing media", on_event=None):
         self.check(jid)
         position = Path(log).stat().st_size if Path(log).exists() else 0
         with open(log, "a", encoding="utf-8") as f:
@@ -134,9 +136,12 @@ class Jobs:
                     if line.startswith("KOTO_EVENT "):
                         try:
                             event = json.loads(line[11:])
-                            self.progress(jid, progress_base+float(event["progress"])*progress_span, event["message"])
+                            if "progress" in event and "message" in event:
+                                self.progress(jid, progress_base+float(event["progress"])*progress_span, event["message"])
                         except (ValueError, KeyError):
-                            pass
+                            continue
+                        if on_event:
+                            on_event(event)
                     elif duration and line.startswith("out_time_us="):
                         try:
                             fraction = max(0, min(0.99, int(line.split("=", 1)[1]) / 1_000_000 / duration))
@@ -167,7 +172,7 @@ class Jobs:
         progress_args = ["-progress", "pipe:1", "-nostats", "-stats_period", "0.5"] if duration else []
         self.command(jid, [binary("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y", *progress_args, *args], root / f"{jid}.log", progress_base, progress_span, duration, message)
 
-    def worker(self, jid, project, capability, request, base=0, span=1):
+    def worker(self, jid, project, capability, request, base=0, span=1, on_take=None):
         selection = project["models"][capability]
         adapter = self.registry.get(selection["id"], capability)
         root = self.store.project_dir(project["id"])
@@ -179,7 +184,18 @@ class Jobs:
         res = work / "result.json"
         req.write_text(json.dumps(spec), encoding="utf-8")
         command = adapter["command"] if adapter.get("custom") else [interpreter(adapter), str(ROOT / "backend" / "koto" / "worker.py")]
-        self.command(jid, [*command, str(req), str(res)], root / f"{jid}.log", base, span)
+        expected={line["id"] for line in request.get("lines",[])} if on_take else set()
+        def validate_take(take):
+            if not isinstance(take,dict) or take.get("id") not in expected or not isinstance(take.get("audio"),str):
+                raise ValueError("Worker returned an unknown or malformed batch take")
+            path=Path(take["audio"]).resolve()
+            if not path.is_relative_to(work.resolve()) or not path.is_file():
+                raise ValueError("Worker returned an invalid batch artifact")
+        def receive(event):
+            if "completed_take" in event:
+                validate_take(event["completed_take"])
+                on_take(event["completed_take"])
+        self.command(jid, [*command, str(req), str(res)], root / f"{jid}.log", base, span,on_event=receive if on_take else None)
         result = json.loads(res.read_text(encoding="utf-8"))
         # Workers may only return artifacts inside their assigned output directory.
         for key in ("audio", "vocals", "background"):
@@ -187,6 +203,11 @@ class Jobs:
                 path = Path(result[key]).resolve()
                 if not path.is_relative_to(work.resolve()) or not path.is_file():
                     raise ValueError("Worker returned an invalid artifact")
+        if on_take:
+            if not isinstance(result.get("takes"),list):
+                raise ValueError("Batch worker returned no takes")
+            for take in result["takes"]:
+                validate_take(take)
         return result
 
     def loop(self):
@@ -430,50 +451,61 @@ class Jobs:
         return {"line_id":line["id"],"suggestions":len(suggestions)}
 
     def synthesize(self, jid, project, options):
-        selected = options.get("line_ids")
-        candidates = [l for l in project["dialogue"] if l.get("translation","").strip() and (not selected or l["id"] in selected)]
-        lines = [l for l in candidates if selected or not l.get("audio") or (l["audio"].get("kind")=="generated" and l["audio"].get("signature")!=signature(project,l))]
+        selected=options.get("line_ids");sid=options.get("speaker_id")
+        candidates=[l for l in project["dialogue"] if l.get("translation","").strip() and (not selected or l["id"] in selected) and (not sid or l["speaker"]==sid)]
+        lines=[l for l in candidates if selected or not l.get("audio") or (l["audio"].get("kind")=="generated" and l["audio"].get("signature")!=signature(project,l))]
         if not lines:
-            if candidates:
-                return {"lines":0,"cached":len(candidates)}
+            if candidates:return {"lines":0,"cached":len(candidates)}
             raise ValueError("Add an English translation first")
-        root = self.store.project_dir(project["id"])
-        generated = 0
-        for i,line in enumerate(lines):
-            self.progress(jid,i/len(lines),f"Generating line {i+1} of {len(lines)}")
-            speaker = next(s for s in project["speakers"] if s["id"] == line["speaker"])
-            config = json.loads(json.dumps(project))
-            voice = speaker.get("voice",{})
-            if voice.get("adapter"):
-                config["models"]["synthesis"]["id"] = voice["adapter"]
+        root=self.store.project_dir(project["id"])
+        generated=0;groups=[(s,[l for l in lines if l["speaker"]==s["id"]]) for s in project["speakers"]]
+        groups=[g for g in groups if g[1]]
+        self.progress(jid,.01,f"Planning {len(lines)} lines for {len(groups)} speakers; compatible voices will stay loaded per speaker")
+        for speaker,group in groups:
+            config=json.loads(json.dumps(project));voice=speaker.get("voice",{})
+            if voice.get("adapter"):config["models"]["synthesis"]["id"]=voice["adapter"]
             config["models"]["synthesis"]["settings"].update(voice.get("settings",{}))
-            reference = self.source_reference(jid, project, speaker)["asset"] if speaker.get("use_source_reference") else speaker.get("reference")
-            request = {"text":line["translation"], "reference":str(self.store.asset(project["id"],reference)) if reference else None}
-            result = self.worker(jid,config,"synthesis",request,i/len(lines),1/len(lines))
-            conversion = None if voice.get("conversion_disabled") else voice.get("conversion") or project["models"].get("voice_conversion")
-            if conversion:
-                config["models"]["voice_conversion"] = conversion
-                self.progress(jid,i/len(lines),f"Converting voice for line {i+1}")
-                result = self.worker(jid,config,"voice_conversion",{"audio":result["audio"],"reference":request["reference"]},i/len(lines),1/len(lines))
-            generated_path = Path(result["audio"])
-            raw_duration = probe(generated_path)["duration"]
-            normalized = root / f"{jid[:8]}_{line['id']}_voice.wav"
-            target = line["end"]-line["start"]
-            filters = "anull"  # Keep the original take; monitor/export apply reversible speed settings.
-            self.ffmpeg(jid,root,"-i",generated_path,"-af",filters,"-ar","48000","-ac","2",normalized)
-            audio = {"asset":normalized.name,"duration":probe(normalized)["duration"],"signature":signature(project,line),"kind":"generated","model":config["models"]["synthesis"],"conversion":conversion,"raw_duration":raw_duration}
-            rate = playback_rate(project,line,raw_duration)
-            played = raw_duration/rate
-            warning = "Timing needs review: rewrite or adjust the line before export" if played > target+.08 else "Voice take is shorter than its slot. Consider a fuller adaptation or a slower speed." if played < target*.75 else ""
-            def merge(p):
-                current = next((l for l in p["dialogue"] if l["id"]==line["id"]),None)
-                if current and signature(p,current)==audio["signature"] and current["start"]==line["start"] and current["end"]==line["end"] and current.get("audio")==line.get("audio"):
-                    current["audio"] = audio
-                    current["warning"] = warning
-                return p
-            self.commit(jid,project["id"],merge)
-            generated += 1
-        return {"lines":generated}
+            reference=self.source_reference(jid,project,speaker)["asset"] if speaker.get("use_source_reference") else speaker.get("reference")
+            reference=str(self.store.asset(project["id"],reference)) if reference else None
+            conversion=None if voice.get("conversion_disabled") else voice.get("conversion") or project["models"].get("voice_conversion")
+            def complete(line,path):
+                nonlocal generated
+                raw_duration=probe(Path(path))["duration"]
+                normalized=root/f"{jid[:8]}_{line['id']}_voice.wav"
+                self.ffmpeg(jid,root,"-i",path,"-af","anull","-ar","48000","-ac","2",normalized)
+                audio={"asset":normalized.name,"duration":probe(normalized)["duration"],"signature":signature(project,line),"kind":"generated","model":config["models"]["synthesis"],"conversion":conversion,"raw_duration":raw_duration}
+                target=line["end"]-line["start"];played=raw_duration/playback_rate(project,line,raw_duration)
+                warning="Timing needs review: rewrite or adjust the line before export" if played>target+.08 else "Voice take is shorter than its slot. Consider a fuller adaptation or a slower speed." if played<target*.75 else ""
+                def merge(p):
+                    current=next((l for l in p["dialogue"] if l["id"]==line["id"]),None)
+                    if current and signature(p,current)==audio["signature"] and current["start"]==line["start"] and current["end"]==line["end"] and current.get("audio")==line.get("audio"):
+                        current["audio"]=audio;current["warning"]=warning
+                    return p
+                self.commit(jid,project["id"],merge);generated+=1
+            adapter=self.registry.get(config["models"]["synthesis"]["id"],"synthesis")
+            # GPU conversion bridges retain their existing per-line path so two large
+            # models are never resident together unless the bridge explicitly owns that flow.
+            if adapter.get("supports_batch") and len(group)>1 and not conversion:
+                seen=set();by_id={l["id"]:l for l in group}
+                def receive(take):
+                    if take["id"] in seen:return
+                    complete(by_id[take["id"]],take["audio"]);seen.add(take["id"])
+                base=generated/len(lines)
+                self.progress(jid,base,f"Loading {speaker['name']} once for {len(group)} lines")
+                result=self.worker(jid,config,"synthesis",{"lines":[{"id":l["id"],"text":l["translation"]} for l in group],"reference":reference},base,len(group)/len(lines),on_take=receive)
+                returned=[t["id"] for t in result["takes"]]
+                if len(returned)!=len(set(returned)) or set(returned)!=set(by_id):
+                    raise ValueError("Synthesis batch returned missing or duplicate dialogue takes")
+                for take in result["takes"]:receive(take)
+            else:
+                for line in group:
+                    self.progress(jid,generated/len(lines),f"Generating {speaker['name']} · line {generated+1} of {len(lines)}")
+                    result=self.worker(jid,config,"synthesis",{"text":line["translation"],"reference":reference},generated/len(lines),1/len(lines))
+                    if conversion:
+                        config["models"]["voice_conversion"]=conversion
+                        result=self.worker(jid,config,"voice_conversion",{"audio":result["audio"],"reference":reference},generated/len(lines),1/len(lines))
+                    complete(line,result["audio"])
+        return {"lines":generated,"speakers":len(groups)}
 
     def export(self, jid, project, options):
         root = self.store.project_dir(project["id"])

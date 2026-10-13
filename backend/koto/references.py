@@ -45,6 +45,6 @@ def reference_segments(project, speaker_id, maximum=12):
         if length < .3:
             break
         selected.append((a, a+length)); total += length
-    if total < 3:
+    if total < 3-1e-6:
         raise ValueError("This speaker needs at least 3 seconds of non-overlapping original dialogue for a voice reference. Correct speaker assignments, or turn off original references and upload a clean sample.")
     return sorted(selected)

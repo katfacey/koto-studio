@@ -69,6 +69,30 @@ virtual environments are recreated against the private Python. After moving the
 installed folder, rerun Install.cmd and the optional profiles you use to repair
 virtual-environment paths; installed environments are not assumed relocatable.
 
+## Streamlined editing and generation
+
+Autosave is enabled by default. Edits save after a 1.2-second pause, without blocking
+continued typing. The footer shows Saving, Saved, or a retained-edits error. Toggle
+Autosave in the footer to use manual saves; Ctrl+S still saves immediately. Undo/redo
+remain available after autosave. Unsaved changes still trigger a browser close warning.
+
+Select a clip and press Delete or Backspace to remove it. Text fields keep their
+normal editing shortcuts. Ctrl+Z restores a deleted clip. Selecting a timeline clip
+moves keyboard focus out of the text editor; deletion is blocked during processing.
+
+Successful generation selects **English mix** and shows a short review toast.
+Playback does not start automatically. Failed/cancelled jobs do not change the mix,
+and historical jobs do not repeatedly switch it back after you choose Original.
+
+**Generate** groups missing/outdated lines by speaker. Piper and XTTS load a voice
+once per speaker batch; XTTS also computes the shared sample conditioning once.
+**Generate speaker** runs only the selected character's missing/outdated lines,
+keeping cached and imported takes. **Generate line** still explicitly regenerates
+one clip. Individual takes retain their own timing and are committed as they finish;
+cancelling a batch preserves completed takes, and retry skips those cached lines.
+Custom adapters can opt into batching. Pipelines with a separate conversion adapter
+retain per-line processing to avoid keeping two unrelated GPU workers resident.
+
 ## Timeline editing and voice timing
 
 Drag a dialogue clip into another speaker lane to correct attribution. Hold Shift

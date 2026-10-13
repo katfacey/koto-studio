@@ -163,6 +163,52 @@ def main():
                         page.locator('[data-act="play"]').click()
                         page.wait_for_function('window.kotoAudio.every(a=>a.paused)');save()
                         page.locator(f'.speaker-card[data-id="{second}"]').click()
+                        # Autosave uses the real PATCH endpoint, including typing during a delayed response.
+                        page.locator('[data-field="line.translation"]').fill('Please wait here.')
+                        page.wait_for_function("document.querySelector('#save-status')?.textContent==='Project saved locally'")
+                        assert project()['dialogue'][0]['translation']=='Please wait here.'
+                        page.evaluate("window.nativeKotoFetch=window.fetch;window.heldSave=false;window.fetch=async function(input,init){const response=await window.nativeKotoFetch(input,init);if(init?.method==='PATCH'){window.heldSave=true;await new Promise(r=>setTimeout(r,1200));window.heldSave=false;}return response;}")
+                        page.locator('[data-field="line.translation"]').fill('Wait beside me.')
+                        page.wait_for_function('window.heldSave')
+                        page.locator('[data-field="line.translation"]').fill('Stay beside me.')
+                        page.wait_for_function("document.querySelector('#save-status')?.textContent==='Project saved locally'")
+                        assert page.locator('[data-field="line.translation"]').input_value()=='Stay beside me.'
+                        assert project()['dialogue'][0]['translation']=='Stay beside me.'
+                        page.evaluate('window.fetch=window.nativeKotoFetch')
+                        # Real installed Piper generates a line, then batches the remaining lines for this speaker.
+                        page.locator('[data-field="speaker.adapter"]').select_option('piper')
+                        page.locator('[data-act="original"]').click()
+                        page.locator('[data-act="generate-line"]').click()
+                        page.locator('[data-act="dub"].active').wait_for(timeout=60000)
+                        assert 'English mix selected' in page.locator('.notice-toast').inner_text()
+                        first_take=project()['dialogue'][0]['audio']['asset']
+                        assert project()['dialogue'][0]['audio']['kind']=='generated'
+                        page.locator(f'.speaker-card[data-id="{second}"]').click()
+                        page.locator('[data-act="original"]').click()
+                        page.locator('[data-act="generate-speaker"]').click()
+                        page.locator('[data-act="dub"].active').wait_for(timeout=60000)
+                        actual=project()
+                        assert all(l['audio'] for l in actual['dialogue'] if l['speaker']==second)
+                        assert actual['dialogue'][0]['audio']['asset']==first_take
+                        # Keyboard deletion must work after leaving text editing, and Undo must restore it.
+                        page.locator('[data-act="tab"][data-tab="Timeline"]').click()
+                        count=page.locator('.dialogue-clip').count()
+                        page.locator('[data-field="line.translation"]').focus()
+                        page.keyboard.press('Delete')
+                        assert page.locator('.dialogue-clip').count()==count
+                        page.locator(f'.dialogue-clip[data-id="{clip_id}"]').click()
+                        assert page.locator(f'.dialogue-clip[data-id="{clip_id}"]').evaluate('(el)=>el===document.activeElement')
+                        page.keyboard.press('Delete')
+                        assert page.locator('.dialogue-clip').count()==count-1
+                        page.wait_for_function("document.querySelector('#save-status')?.textContent==='Project saved locally'")
+                        assert len(project()['dialogue'])==count-1
+                        page.keyboard.press('Control+z')
+                        assert page.locator(f'.dialogue-clip[data-id="{clip_id}"]').count()==1
+                        page.locator(f'.dialogue-clip[data-id="{clip_id}"]').click()
+                        page.keyboard.press('Backspace')
+                        assert page.locator('.dialogue-clip').count()==count-1
+                        page.keyboard.press('Control+z');save()
+                        page.locator(f'.speaker-card[data-id="{second}"]').click()
                         page.evaluate('document.fonts.ready')
                         page.screenshot(path=str(output / 'koto-editor.png'), full_page=True)
                         # The queue data below is an explicit UI fixture; no inference is simulated.
@@ -178,7 +224,7 @@ def main():
                         print('Browser diagnostic:', page.evaluate("({url:location.href,tracks:Array.from(document.querySelectorAll('[data-track]')).map(n=>({class:n.className,track:n.dataset.track,id:n.dataset.id})),errors:document.querySelector('.error-toast')?.textContent})"))
                         raise
                     browser.close()
-                print('Real Chromium checks passed: panel resizing, clip reassignment and retiming, lane ordering, mutes, visibility, original-reference selection, timing hints and suggestion selection, real live audio/mutes, persistence, and Cancel X.')
+                print('Real Chromium checks passed: panel resizing, clip reassignment and retiming, lane ordering, mutes, visibility, original-reference selection, timing hints and suggestion selection, real live audio/mutes, autosave races, real Piper generation/batching, English-mix completion, keyboard delete/undo, persistence, and Cancel X.')
             finally:
                 if server.poll() is None:
                     server.terminate()

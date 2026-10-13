@@ -11,19 +11,21 @@ const root={innerHTML:'',querySelector(selector){
     if(!nodes.has(selector))nodes.set(selector,fakeNode());return nodes.get(selector);
   }return null;
 },querySelectorAll(){return [];},addEventListener(type,fn){listeners[type]=fn;}};
-globalThis.document={querySelector(){return root;},addEventListener(){}};
+let keydown;
+globalThis.document={querySelector(){return root;},addEventListener(type,fn){if(type==='keydown')keydown=fn;}};
 globalThis.window={addEventListener(){}};
 globalThis.localStorage={getItem(){return null;},setItem(){}};
 if(!globalThis.crypto)Object.defineProperty(globalThis,'crypto',{value:webcrypto});
 const timers=[];
 globalThis.setInterval=(fn)=>{timers.push(fn);return timers.length;};
-globalThis.setTimeout=()=>0;globalThis.clearTimeout=()=>{};
+let nextTimeout=0;const delayed=new Map();
+globalThis.setTimeout=(fn,ms)=>{const id=++nextTimeout;delayed.set(id,{fn,ms});return id;};globalThis.clearTimeout=id=>delayed.delete(id);
 
 const p={id:'test-project',name:'Sample <img src=x onerror=alert(1)>',revision:1,demo:true,media:null,assets:{},speakers:[{id:'s1',name:'Speaker 01',color:'#8b8aff',voice:{},reference:null}],dialogue:[{id:'l1',start:1,end:3,speaker:'s1',source:'こんにちは',translation:'Hello there.',subtitle:'Hello.',audio:null}],models:{synthesis:{id:'piper',settings:{model:'',speaker_id:0}},translation:{id:'ollama',settings:{model:'qwen3:14b'}},separation:{id:'demucs',settings:{model:'htdemucs'}},transcription:{id:'faster-whisper',settings:{model:'large-v3'}},diarization:{id:'pyannote',settings:{model:''}}},settings:{audio_stream:null,video_stream:null,subtitle_stream:null,background_mode:'silence',background_gain:.8,dialogue_gain:1,fit_duration:true,output:'mkv'}};
 let saved;
 let jobs=[];
 let nextJob=0;
-let rejectJob='';
+let rejectJob='';let patchGate=null,patchFailure='';
 const models=Object.entries(p.models).map(([capability,s])=>({id:s.id,label:s.id,capability,available:false,description:'Test worker metadata',fields:[]}));
 globalThis.fetch=async(path,init={})=>{
   let value;
@@ -31,7 +33,7 @@ globalThis.fetch=async(path,init={})=>{
   else if(path==='/api/models')value=models;
   else if(path==='/api/projects'&&init.method==='POST')value=p;
   else if(path==='/api/projects')value=[];
-  else if(path==='/api/projects/test-project'&&init.method==='PATCH'){saved=JSON.parse(init.body);Object.assign(p,saved,{revision:saved.revision+1});value=p;}
+  else if(path==='/api/projects/test-project'&&init.method==='PATCH'){const snapshot=JSON.parse(init.body);if(patchGate)await patchGate;if(patchFailure)return {ok:false,json:async()=>({detail:patchFailure})};saved=snapshot;Object.assign(p,saved,{revision:saved.revision+1});value=p;}
   else if(path==='/api/projects/test-project')value=p;
   else if(path==='/api/projects/test-project/jobs'&&init.method==='POST'){
     if(rejectJob)return {ok:false,json:async()=>({detail:rejectJob})};
@@ -105,4 +107,30 @@ assert.ok(nodes.get('#toast-root').innerHTML.includes('Prepare complete'));
 rejectJob='Select at least one source track in the Clip inspector before Prepare.';
 await click('job',{kind:'prepare'});
 assert.ok(nodes.get('#toast-root').innerHTML.includes(rejectJob));
-console.log('UI checks passed: editor/actions, escaped text, Prepare image-subtitle recovery, queued/running/failed/completed feedback, and immediate validation errors.');
+// Successful completion changes monitor mode exactly once; failure does not.
+rejectJob='';await click('original');await click('job',{kind:'synthesize'});
+jobs[0]={...jobs[0],status:'failed',message:'Test-only worker failure'};await timers[1]();
+assert.ok(root.innerHTML.includes('data-act="original" class="active"'));
+await click('dismiss-error');await click('job',{kind:'synthesize'});
+jobs[0]={...jobs[0],status:'completed',progress:1,message:'Complete'};await timers[1]();
+assert.ok(root.innerHTML.includes('data-act="dub" class="active"'));
+assert.ok(nodes.get('#toast-root').innerHTML.includes('English mix selected'));
+await click('original');await timers[1]();assert.ok(root.innerHTML.includes('data-act="original" class="active"'));
+await click('tab',{tab:'Timeline'});await click('select-line',{id:'l1'});
+const press=(key,target={dataset:{},closest(){return null;}})=>{let prevented=false;keydown({key,target,preventDefault(){prevented=true;}});return prevented;};
+assert.equal(press('Delete',{dataset:{},closest(sel){return sel.includes('input,textarea')?{}:null;}}),false);
+assert.equal(press('Backspace',{dataset:{},isContentEditable:true,closest(){return null;}}),false);
+assert.equal(press('Delete'),true);assert.ok(root.innerHTML.includes('add your first line'));await click('save');assert.equal(p.dialogue.length,0);
+await click('undo');await click('save');assert.equal(p.dialogue.length,1);
+assert.equal(press('Backspace'),true);await click('undo');await click('save');
+await click('select-line',{id:'l1'});
+const change=text=>listeners.input({...{target:{dataset:{field:'line.translation'},type:'textarea',value:text,closest(){return null;}}}});
+const autosave=async()=>{const entry=[...delayed].find(([,v])=>v.ms===1200);assert(entry,'Autosave was not scheduled');delayed.delete(entry[0]);await entry[1].fn();};
+change('Autosaved text.');await autosave();assert.equal(p.dialogue[0].translation,'Autosaved text.');
+let release;patchGate=new Promise(resolve=>{release=resolve;});change('Snapshot before more typing.');const inFlight=autosave();
+for(let i=0;i<4;i++)await Promise.resolve();change('Newer text entered while saving.');release();await inFlight;patchGate=null;
+assert.equal(p.dialogue[0].translation,'Snapshot before more typing.');await autosave();assert.equal(p.dialogue[0].translation,'Newer text entered while saving.');
+patchFailure='Test-only disk error';change('Keep this edit if saving fails.');await autosave();assert.ok(nodes.get('#save-status').textContent.includes('changes retained'));
+assert.notEqual(p.dialogue[0].translation,'Keep this edit if saving fails.');patchFailure='';await click('save');assert.equal(p.dialogue[0].translation,'Keep this edit if saving fails.');
+listeners.input({target:{dataset:{field:'autosave'},type:'checkbox',checked:false}});change('Manual-only edit.');assert(![...delayed.values()].some(v=>v.ms===1200));await click('save');
+console.log('UI checks passed: completion mode/toast, keyboard deletion/undo, protected typing, debounced autosave, in-flight edits, save failure recovery, and existing editor/queue flows.');

@@ -33,7 +33,16 @@ def main():
             if sys.byteorder != "little":
                 samples.byteswap()
             assert max(map(abs, samples)) > 100, "Synthesized speech is silent"
-        print(f"Real Piper worker synthesized {duration:.2f}s of non-silent English speech.")
+        request.write_text(json.dumps({"adapter":"piper","lines":[{"id":"first","text":"The next train will arrive soon."},{"id":"second","text":"Let's walk home together."}],"settings":{"model":str(model),"speaker_id":0},"output_dir":str(work)}),encoding="utf-8")
+        subprocess.run([str(python),str(ROOT/'backend/koto/worker.py'),str(request),str(result)],cwd=ROOT,env=runtime_environment(python=python),check=True,timeout=120)
+        batch=json.loads(result.read_text(encoding="utf-8"))["takes"]
+        assert [take["id"] for take in batch]==["first","second"]
+        for take in batch:
+            with wave.open(take["audio"],"rb") as audio:
+                assert audio.getnframes()/audio.getframerate()>1
+                assert max(map(abs,array.array("h",audio.readframes(audio.getnframes()))))>100
+        print(f"Real Piper worker synthesized {duration:.2f}s of single-line speech and a two-line batch using one loaded voice.")
+
 
 
 if __name__ == "__main__":

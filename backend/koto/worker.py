@@ -19,6 +19,22 @@ def progress(value, message):
     print("KOTO_EVENT " + json.dumps({"progress": value, "message": message}), flush=True)
 
 
+def synthesize_lines(request, out, render):
+    lines = request.get("lines")
+    if lines is None:
+        path=out/"speech.wav";render(request["text"],path);return {"audio":str(path)}
+    if not isinstance(lines,list) or not lines:
+        raise ValueError("A synthesis batch needs dialogue lines")
+    takes=[]
+    for index,line in enumerate(lines):
+        progress(.15+.8*index/len(lines),f"Synthesizing line {index+1} of {len(lines)} with the loaded voice")
+        path=out/f"speech_{index}.wav"
+        render(line["text"],path)
+        take={"id":line["id"],"audio":str(path)};takes.append(take)
+        print("KOTO_EVENT "+json.dumps({"completed_take":take}),flush=True)
+    return {"takes":takes}
+
+
 def run(request):
     adapter = request["adapter"]
     settings = request.get("settings", {})
@@ -78,13 +94,12 @@ def run(request):
         if not model_path.is_file() or not Path(str(model_path) + ".json").is_file():
             raise ValueError("Configure an English .onnx voice and its .onnx.json config first")
         voice = PiperVoice.load(str(model_path))
-        path = out / "speech.wav"
-        progress(0.1, "Synthesizing English speech")
-        with wave.open(str(path), "wb") as f:
-            # Piper 1.3+ API; old piper packages need reinstalling in this environment.
-            from piper.config import SynthesisConfig
-            voice.synthesize_wav(request["text"], f, syn_config=SynthesisConfig(speaker_id=int(settings.get("speaker_id", 0))))
-        return {"audio": str(path)}
+        from piper.config import SynthesisConfig
+        config=SynthesisConfig(speaker_id=int(settings.get("speaker_id",0)))
+        def render(text,path):
+            with wave.open(str(path),"wb") as f:
+                voice.synthesize_wav(text,f,syn_config=config)
+        return synthesize_lines(request,out,render)
     if adapter == "xtts":
         import os
         # Official XTTS checkpoints contain config classes predating Torch 2.6.
@@ -106,10 +121,10 @@ def run(request):
         model.load_checkpoint(config, checkpoint_dir=str(directory), eval=True)
         model.to(torch.device(device))
         conditioning, embedding = model.get_conditioning_latents(audio_path=[reference])
-        output = model.inference(request["text"], "en", conditioning, embedding)
-        path = out / "speech.wav"
-        sf.write(str(path), output["wav"], 24000)
-        return {"audio": str(path)}
+        def render(text,path):
+            output=model.inference(text,"en",conditioning,embedding)
+            sf.write(str(path),output["wav"],24000)
+        return synthesize_lines(request,out,render)
     raise ValueError(f"Unknown built-in worker: {adapter}")
 
 

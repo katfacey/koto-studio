@@ -351,6 +351,69 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         reopened=Store(Path(self.temp.name))
         self.assertEqual(next(j for j in reopened.jobs() if j["id"]==jid)["status"],"interrupted")
 
+    async def configure_batch_fixture(self, pause=False):
+        await self.upload('media',self.video);await self.run_job('prepare')
+        root=Path(self.temp.name);calls=root/'batch-calls.jsonl';flag=root/'pause.flag'
+        if pause:flag.touch()
+        script=root/'batch-fixture.py'
+        script.write_text("import json,sys,time,shutil\nfrom pathlib import Path\nr=json.loads(Path(sys.argv[1]).read_text());settings=r['settings']\nif r.get('reference'):\n import wave\n with wave.open(r['reference']) as w: assert w.getnframes()/w.getframerate()>=2.95\nlines=r.get('lines') or [{'id':'single','text':r['text']}]\nwith open(settings['calls'],'a') as f: f.write(json.dumps([l['id'] for l in lines])+'\\n')\ntakes=[]\nfor i,l in enumerate(lines):\n p=Path(r['output_dir'])/f'take_{i}.wav';shutil.copyfile(settings['audio'],p)\n take={'id':l['id'],'audio':str(p)};takes.append(take)\n if 'lines' in r: print('KOTO_EVENT '+json.dumps({'completed_take':take}),flush=True)\n if i==0 and Path(settings['pause']).exists(): time.sleep(5)\nPath(sys.argv[2]).write_text(json.dumps({'takes':takes} if 'lines' in r else {'audio':str(p)}))\n",encoding='utf-8')
+        self.app.state.registry.adapters['batch-fixture']={'id':'batch-fixture','capability':'synthesis','custom':True,'supports_batch':True,'supports_reference':True,'command':[sys.executable,str(script)]}
+        models={**self.p['models'],'synthesis':{'id':'batch-fixture','settings':{'audio':str(self.take),'calls':str(calls),'pause':str(flag)}}}
+        lines=[{'id':'first','speaker':'speaker-1','start':.1,'end':1.1,'source':'source','translation':'First line.','audio':None},{'id':'second','speaker':'speaker-1','start':1.4,'end':2.4,'source':'source','translation':'Second line.','audio':None},{'id':'third','speaker':'speaker-1','start':2.8,'end':3.8,'source':'source','translation':'Third line.','audio':None}]
+        self.p['speakers'][0]['reference']=self.p['assets']['original_audio']
+        if pause:self.p['speakers'][0]['use_source_reference']=True
+        await self.patch(models=models,dialogue=lines,speakers=self.p['speakers'])
+        return calls,flag
+
+    async def test_synthesis_groups_speaker_lines_and_preserves_cache_and_imported_takes(self):
+        calls,_=await self.configure_batch_fixture()
+        self.p['speakers'].append({'id':'other','name':'Other','color':'#ff9900','voice':{}})
+        self.p['dialogue'][1]['speaker']='other'
+        await self.patch(speakers=self.p['speakers'],dialogue=self.p['dialogue'])
+        result=await self.run_job('synthesize')
+        self.assertEqual(result['result'],{'lines':3,'speakers':2})
+        requests=[json.loads(x) for x in calls.read_text().splitlines()]
+        self.assertEqual(requests,[['first','third'],['single']])
+        self.assertTrue(all(l['audio'] for l in self.p['dialogue']))
+        cached=await self.run_job('synthesize');self.assertEqual(cached['result']['cached'],3)
+        self.assertEqual(len(calls.read_text().splitlines()),2)
+        await self.upload('dialogue/third/audio',self.take)
+        self.p['dialogue'][0]['translation']='A revised first line.'
+        other=self.p['dialogue'][1]['audio']['asset']
+        await self.patch(dialogue=self.p['dialogue'])
+        response=await self.client.post(f'/api/projects/{self.pid}/jobs',json={'kind':'synthesize','options':{'speaker_id':'speaker-1'}})
+        job=await self.wait_job(response.json()['id']);self.assertEqual(job['result']['lines'],1)
+        self.assertEqual(self.p['dialogue'][2]['audio']['kind'],'imported')
+        self.assertEqual(self.p['dialogue'][1]['audio']['asset'],other)
+
+    async def test_batch_rejects_artifacts_outside_the_worker_directory(self):
+        calls,_=await self.configure_batch_fixture()
+        script=Path(self.temp.name)/'bad-batch.py'
+        script.write_text("import json,sys\nfrom pathlib import Path\nr=json.loads(Path(sys.argv[1]).read_text());take={'id':r['lines'][0]['id'],'audio':r['settings']['audio']}\nprint('KOTO_EVENT '+json.dumps({'completed_take':take}),flush=True)\nPath(sys.argv[2]).write_text(json.dumps({'takes':[take]}))\n",encoding='utf-8')
+        self.app.state.registry.adapters['batch-fixture']['command']=[sys.executable,str(script)]
+        response=await self.client.post(f'/api/projects/{self.pid}/jobs',json={'kind':'synthesize'})
+        job=await self.wait_job(response.json()['id'],expected='failed')
+        self.assertIn('invalid batch artifact',job['message'])
+        self.assertTrue(all(l['audio'] is None for l in self.p['dialogue']))
+
+    async def test_cancelled_batch_keeps_completed_takes_and_retries_only_remaining_lines(self):
+        calls,flag=await self.configure_batch_fixture(pause=True)
+        response=await self.client.post(f'/api/projects/{self.pid}/jobs',json={'kind':'synthesize'})
+        jid=response.json()['id']
+        for _ in range(400):
+            current=(await self.client.get(f'/api/projects/{self.pid}')).json()
+            if current['dialogue'][0]['audio']:break
+            await asyncio.sleep(.025)
+        else:self.fail('Batch did not commit its first take before finishing')
+        self.assertAlmostEqual(current['speakers'][0]['source_reference']['duration'],3,delta=.05)
+        asset=current['dialogue'][0]['audio']['asset']
+        await self.client.post(f'/api/jobs/{jid}/cancel');await self.wait_job(jid,expected='cancelled')
+        self.assertEqual(self.p['dialogue'][0]['audio']['asset'],asset)
+        self.assertIsNone(self.p['dialogue'][1]['audio'])
+        flag.unlink();result=await self.run_job('synthesize');self.assertEqual(result['result']['lines'],2)
+        self.assertEqual(self.p['dialogue'][0]['audio']['asset'],asset)
+        self.assertEqual([json.loads(x) for x in calls.read_text().splitlines()],[['first','second','third'],['second','third']])
+
     async def test_synthesis_then_voice_conversion_and_speaker_override(self):
         await self.upload("media",self.video)
         await self.upload("subtitles",self.sub,{"language":"en"})

@@ -83,3 +83,13 @@ Translation adapters can declare `"supports_alternatives": true`. They then rece
 `current_translation`, `target_seconds`, and `approximate_word_budget` for one clip,
 and return `{"alternatives":["Concise wording", "Near-target wording", "Fuller wording"]}`.
 Suggestions never replace the adaptation automatically.
+
+Synthesis adapters may declare `"supports_batch": true`. A batch request supplies
+`lines: [{"id":"existing-line-id","text":"English"}, ...]` and one shared `reference`.
+Return `{"takes":[{"id":"existing-line-id","audio":"absolute.wav"}, ...]}`.
+Every output must remain inside `output_dir`. To preserve completed work on cancellation,
+emit `KOTO_EVENT {"completed_take":{"id":"existing-line-id","audio":"absolute.wav"}}`
+after each finished file. Emit only finished takes, not intermediate files. IDs must
+match the request; missing, duplicate or external artifacts fail validation. Single-line
+requests continue to use `text` and return `audio`. KOTO batches only a speaker's
+compatible takes and retains the original per-line flow for conversion pipelines.
