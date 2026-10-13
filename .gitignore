@@ -1,0 +1,12 @@
+.venv/
+.workers/
+env/
+.npm-cache/
+data/
+frontend/node_modules/
+frontend/dist/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.log
+*.zip

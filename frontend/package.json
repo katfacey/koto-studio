@@ -1,0 +1,10 @@
+{
+  "name": "koto-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/app.js && node --check src/icons.js",
+    "build": "python ../scripts/build_frontend.py"
+  }
+}
