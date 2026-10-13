@@ -6,7 +6,7 @@ model environments, and optional local translation runtime inside the app folder
 
 **[Download the complete ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)**
 
-[Windows standalone bootstrap and real Piper speech verified](https://github.com/katfacey/koto-studio/actions/runs/38384120806)
+[Windows bootstrap, real Piper speech, and editor resizing verified](https://github.com/katfacey/koto-studio/actions/runs/38390591579)
 with only Windows System32 on PATH.
 
 ## Standalone installation

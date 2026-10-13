@@ -3,7 +3,7 @@
 Local checks: Linux, Python 3.12, FFmpeg 7.1.5, Node 24.
 Windows checks: GitHub-hosted Windows, managed Python 3.11, bundled FFmpeg 9.0.2.
 
-**[Windows standalone installation and real Piper synthesis passed](https://github.com/katfacey/koto-studio/actions/runs/38384120806).**
+**[Windows installation, real Piper synthesis, and Chromium editor checks passed](https://github.com/katfacey/koto-studio/actions/runs/38390591579).**
 
 The following checks passed:
 
@@ -37,9 +37,12 @@ The following checks passed:
   download gated weights or perform diarization inference.
 - Panel geometry and interaction checks cover width/height bounds, pointer resizing,
   saved sizes, keyboard access, reset, and malformed saved preferences.
+- Real Chromium on Windows rendered the editor and verified all four panel drags,
+  saved sizes after reload, keyboard resizing, double-click reset, and the Cancel X.
+  The workflow includes a Windows-editor-screenshot artifact of the built-in sample.
 - Windows PowerShell 5.1 installation of Piper with the real downloaded Lessac
   voice and UTF-8, case-sensitive phoneme config validation through private Python.
-  The actual isolated Piper worker generated 2.68 seconds of non-silent English
+  The actual isolated Piper worker generated 3.13 seconds of non-silent English
   speech on CPU with PATH limited to Windows System32.
 
 Test-only model workers return deterministic fixture audio/text. No GPU model
@@ -54,11 +57,11 @@ workflow installs into a path with spaces and reinstalls the core while checking
 that a project-data fixture survives. It also installs and exercises the real
 Piper worker, separately from deterministic protocol fixtures.
 
-Chromium launches failed because the execution sandbox denies its required
-socket operations. Browser visual layout/playback, native pywebview mode,
-optional GPU package installation, and RTX 5090 inference
-have not been validated. The archive includes setup instructions and a CUDA
-architecture/matrix diagnostic for the target machine.
+Local Chromium launches remain blocked by sandbox socket restrictions. The Windows
+browser checks above ran on GitHub's hosted runner. Real-media browser playback,
+native pywebview mode, gated pyannote inference, optional GPU package installation,
+and RTX 5090 inference still need target-machine validation. The archive includes
+setup instructions and a CUDA architecture/matrix diagnostic for the target machine.
 
 Run checks again on the target host:
 
@@ -67,4 +70,5 @@ Run checks again on the target host:
 & ".\.venv\Scripts\python.exe" -m unittest discover -s backend/tests -v
 # Optional Node checks:
 node frontend/check-ui.mjs
+node frontend/check-layout.mjs
 ```
