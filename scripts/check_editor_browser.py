@@ -174,6 +174,17 @@ def main():
                         page.wait_for_function("document.querySelector('#save-status')?.textContent==='Project saved locally'")
                         assert page.locator('[data-field="line.translation"]').input_value()=='Stay beside me.'
                         assert project()['dialogue'][0]['translation']=='Stay beside me.'
+                        # A save response must not detach the line object being trimmed.
+                        old_end=project()['dialogue'][0]['end']
+                        page.locator('[data-field="line.translation"]').fill('Remain beside me.')
+                        page.wait_for_function('window.heldSave')
+                        handle=page.locator(f'.dialogue-clip[data-id="{clip_id}"] [data-trim="end"]')
+                        box=handle.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+                        page.mouse.move(x,y);page.mouse.down()
+                        page.wait_for_function('!window.heldSave')
+                        page.mouse.move(x+8,y,steps=4);page.mouse.up()
+                        page.wait_for_function("document.querySelector('#save-status')?.textContent==='Project saved locally'")
+                        assert project()['dialogue'][0]['end']>old_end
                         page.evaluate('window.fetch=window.nativeKotoFetch')
                         # Real installed Piper generates a line, then batches the remaining lines for this speaker.
                         page.locator('[data-field="speaker.adapter"]').select_option('piper')
@@ -224,7 +235,7 @@ def main():
                         print('Browser diagnostic:', page.evaluate("({url:location.href,tracks:Array.from(document.querySelectorAll('[data-track]')).map(n=>({class:n.className,track:n.dataset.track,id:n.dataset.id})),errors:document.querySelector('.error-toast')?.textContent})"))
                         raise
                     browser.close()
-                print('Real Chromium checks passed: panel resizing, clip reassignment and retiming, lane ordering, mutes, visibility, original-reference selection, timing hints and suggestion selection, real live audio/mutes, autosave races, real Piper generation/batching, English-mix completion, keyboard delete/undo, persistence, and Cancel X.')
+                print('Real Chromium checks passed: panel resizing, clip reassignment and retiming, lane ordering, mutes, visibility, original-reference selection, timing hints and suggestion selection, real live audio/mutes, autosave typing/trim races, real Piper generation/batching, English-mix completion, keyboard delete/undo, persistence, and Cancel X.')
             finally:
                 if server.poll() is None:
                     server.terminate()
