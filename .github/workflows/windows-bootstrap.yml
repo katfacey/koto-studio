@@ -1,0 +1,62 @@
+name: Windows self-contained setup
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'backend/**'
+      - '*.cmd'
+      - 'install*.js'
+      - 'pinokio.js'
+      - 'start.js'
+      - '.github/workflows/windows-bootstrap.yml'
+permissions:
+  contents: read
+jobs:
+  core-without-system-tools:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse all installers with Windows PowerShell
+        shell: pwsh
+        run: |
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\check-installers.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Bootstrap with only Windows system executables on PATH
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile core
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify app-owned runtimes and run the HTTP/media suite
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          & ".\runtime\uv\uv.exe" --no-config pip install --python ".\.venv\Scripts\python.exe" -r backend\requirements-dev.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ".\.venv\Scripts\python.exe" -c "import sys; from pathlib import Path; sys.path.insert(0,'backend'); from koto.runtime import executable; root=Path.cwd(); assert Path(sys.base_prefix).is_relative_to(root/'runtime'/'python'); assert Path(executable('ffmpeg')).is_relative_to(root/'runtime'); assert Path(executable('ffprobe')).is_relative_to(root/'runtime')"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ".\.venv\Scripts\python.exe" -m unittest discover -s backend\tests -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Start the actual server with app-owned executables
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          $StudioRoot = (Get-Location).Path
+          $Server = Start-Process -FilePath "$StudioRoot\.venv\Scripts\python.exe" -ArgumentList 'scripts\serve.py' -PassThru -RedirectStandardOutput "$StudioRoot\runtime\server.stdout.log" -RedirectStandardError "$StudioRoot\runtime\server.stderr.log"
+          try {
+            $Ready = $false
+            for ($Attempt = 0; $Attempt -lt 60; $Attempt++) {
+              if ($Server.HasExited) { throw "Server exited: $(Get-Content runtime\server.stderr.log -Raw)" }
+              try {
+                $Health = Invoke-RestMethod http://127.0.0.1:8765/api/health -TimeoutSec 2
+                if ($Health.version -eq '0.2.0' -and $Health.ffmpeg -and $Health.ffprobe) { $Ready = $true; break }
+              } catch { }
+              Start-Sleep -Seconds 1
+            }
+            if (-not $Ready) { throw 'Managed server did not become ready' }
+            $Page = Invoke-WebRequest http://127.0.0.1:8765/ -UseBasicParsing
+            if (-not $Page.Content.Contains('KOTO Studio')) { throw 'Built editor was not served' }
+          } finally { if (-not $Server.HasExited) { Stop-Process -Id $Server.Id -Force } }

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": "0.2.0",
+  "python": "3.11",
+  "uv": {
+    "version": "0.13.0",
+    "url": "https://github.com/astral-sh/uv/releases/download/0.13.0/uv-x86_64-pc-windows-msvc.zip",
+    "sha256": "088962f9e7b7bd9ea740c04c650b2a21c8928c345bd99ac24350dc924dba656c"
+  },
+  "ffmpeg": {
+    "version": "9.0.2",
+    "url": "https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip",
+    "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba"
+  },
+  "ollama": {
+    "version": "v0.40.3",
+    "url": "https://github.com/ollama/ollama/releases/download/v0.40.3/ollama-windows-amd64.zip",
+    "sha256": "e5ecff02dfc7cae8ddf6d6b7a7ac5f727ffeedf4491f44ae75ff5b0820dbbbd5"
+  },
+  "translation_model": "qwen3:14b"
+}

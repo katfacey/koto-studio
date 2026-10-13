@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install.ps1" -Profile core
 if errorlevel 1 (
   echo Installation failed. Read the message above.
   pause

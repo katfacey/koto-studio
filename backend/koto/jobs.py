@@ -14,6 +14,7 @@ from pathlib import Path
 from .media import atempo_factor, binary, parse_subtitles, probe, write_srt
 from .registry import interpreter, local_json
 from .store import ROOT
+from .runtime import executable, runtime_environment
 
 CAPABILITIES = {"separate":"separation", "transcribe":"transcription", "diarize":"diarization", "translate":"translation", "synthesize":"synthesis"}
 
@@ -70,7 +71,7 @@ class Jobs:
     def command(self, jid, args, log, progress_base=0, progress_span=1):
         self.check(jid)
         with open(log, "a", encoding="utf-8") as f:
-            proc = subprocess.Popen([str(a) for a in args], stdout=f, stderr=subprocess.STDOUT, start_new_session=os.name != "nt", creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
+            proc = subprocess.Popen([str(a) for a in args], stdout=f, stderr=subprocess.STDOUT, env=runtime_environment(python=str(args[0])), start_new_session=os.name != "nt", creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
         position = Path(log).stat().st_size
         try:
             while proc.poll() is None:
@@ -94,7 +95,7 @@ class Jobs:
         except BaseException:
             if proc.poll() is None:
                 if os.name == "nt":
-                    subprocess.run(["taskkill","/PID",str(proc.pid),"/T","/F"], capture_output=True)
+                    subprocess.run([executable("taskkill"),"/PID",str(proc.pid),"/T","/F"], capture_output=True)
                 else:
                     os.killpg(proc.pid, signal.SIGTERM)
                     try:

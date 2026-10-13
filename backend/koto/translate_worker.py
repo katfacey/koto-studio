@@ -4,6 +4,9 @@ import sys
 import urllib.request
 from pathlib import Path
 
+from runtime import configure_process, ollama_url
+configure_process()
+
 spec = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 payload = {
     "model": spec["model"], "stream": False, "think": False,
@@ -14,7 +17,7 @@ payload = {
     ],
     "options": {"temperature":spec["temperature"]}, "keep_alive": 0,
 }
-req = urllib.request.Request("http://127.0.0.1:11434/api/chat",data=json.dumps(payload).encode(),headers={"Content-Type":"application/json"})
+req = urllib.request.Request(ollama_url()+"/api/chat",data=json.dumps(payload).encode(),headers={"Content-Type":"application/json"})
 with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req,timeout=600) as response:
     body = json.load(response)
 result = json.loads(body["message"]["content"])

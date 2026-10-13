@@ -24,7 +24,7 @@ let saved;
 const models=Object.entries(p.models).map(([capability,s])=>({id:s.id,label:s.id,capability,available:false,description:'Test worker metadata',fields:[]}));
 globalThis.fetch=async(path,init={})=>{
   let value;
-  if(path==='/api/health')value={version:'0.1.0',local:true,gpu:null};
+  if(path==='/api/health')value={version:'0.2.0',local:true,gpu:null};
   else if(path==='/api/models')value=models;
   else if(path==='/api/projects'&&init.method==='POST')value=p;
   else if(path==='/api/projects')value=[];

@@ -1,0 +1,12 @@
+$ErrorActionPreference = "Stop"
+Write-Host "KOTO optional model setup (all files remain inside the application folder)"
+Write-Host "1. Audio separation + Japanese recognition + English Piper voice (several GB)"
+Write-Host "2. XTTS reference-voice worker (local model weights must be provided)"
+Write-Host "3. Local Ollama + Qwen3 14B translation model (roughly 12 GB)"
+Write-Host "4. All workers + local translation (roughly 20+ GB; gated/model files may still need provisioning)"
+Write-Host "5. Cancel"
+$Choice = Read-Host "Choose 1-5"
+$Profiles = @{ "1"="models"; "2"="xtts"; "3"="translation"; "4"="all" }
+if ($Choice -eq "5") { exit 0 }
+if (-not $Profiles.ContainsKey($Choice)) { throw "Choose a number from 1 to 5" }
+& (Join-Path $PSScriptRoot "install.ps1") -Profile $Profiles[$Choice]

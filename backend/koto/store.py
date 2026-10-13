@@ -60,7 +60,7 @@ class Store:
                 "transcription": {"id": "faster-whisper", "settings": {"model": "large-v3", "device": "cuda", "compute_type": "float16"}},
                 "diarization": {"id": "pyannote", "settings": {"model": "", "device": "cuda"}},
                 "translation": {"id": "ollama", "settings": {"model": "qwen3:14b", "temperature": 0.2}},
-                "synthesis": {"id": "piper", "settings": {"model": "", "speaker_id": 0}},
+                "synthesis": {"id": "piper", "settings": {"model": "runtime/models/piper/en_US-lessac-medium.onnx", "speaker_id": 0}},
             },
             "settings": {"audio_stream": None, "video_stream": None, "subtitle_stream": None, "background_gain": 0.8, "dialogue_gain": 1.0, "fit_duration": True, "output": "mkv", "background_mode": "separated"},
         }

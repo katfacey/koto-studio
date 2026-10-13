@@ -9,13 +9,14 @@ import urllib.request
 from pathlib import Path
 
 from .store import ROOT
+from .runtime import ollama_url, runtime_environment
 
 BUILTINS = [
     {"id": "demucs", "label": "Demucs · HTDemucs", "capability": "separation", "module": "demucs", "environment": "audio", "description": "Local dialogue / accompaniment separation. Singing-oriented models may lose speech or effects.", "fields": [{"key":"model","label":"Model","type":"text","default":"htdemucs"},{"key":"device","label":"Device","type":"select","options":["cuda","cpu"],"default":"cuda"}]},
     {"id": "faster-whisper", "label": "Faster Whisper", "capability": "transcription", "module": "faster_whisper", "environment": "whisper", "description": "Japanese speech recognition with timestamps. Models download on first use unless a local path is supplied.", "fields": [{"key":"model","label":"Model or local path","type":"text","default":"large-v3"},{"key":"device","label":"Device","type":"select","options":["cuda","cpu"],"default":"cuda"},{"key":"compute_type","label":"Precision","type":"select","options":["float16","int8_float16","int8","float32"],"default":"float16"}]},
     {"id": "pyannote", "label": "Pyannote · local pipeline", "capability": "diarization", "module": "pyannote.audio", "environment": "audio", "description": "Supply a locally provisioned pipeline YAML and its weights. No hosted inference.", "fields": [{"key":"model","label":"Local pipeline YAML","type":"text","default":""},{"key":"device","label":"Device","type":"select","options":["cuda","cpu"],"default":"cuda"}]},
-    {"id": "ollama", "label": "Ollama · local LLM", "capability": "translation", "module": None, "environment": None, "description": "Uses Ollama on 127.0.0.1:11434. Pull the selected model in Ollama first.", "fields": [{"key":"model","label":"Installed Ollama model","type":"text","default":"qwen3:14b"},{"key":"temperature","label":"Temperature","type":"number","default":0.2}]},
-    {"id": "piper", "label": "Piper · English voices", "capability": "synthesis", "module": "piper", "environment": "piper", "description": "Fast local speech synthesis. Supply an English .onnx voice and matching .onnx.json file. Does not clone voices.", "fields": [{"key":"model","label":"Voice .onnx path","type":"text","default":""},{"key":"speaker_id","label":"Voice index","type":"number","default":0}]},
+    {"id": "ollama", "label": "Ollama · local LLM", "capability": "translation", "module": None, "environment": None, "description": "App-managed Ollama on 127.0.0.1:11435. Run Install-Translation.cmd or use the Pinokio translation installer.", "fields": [{"key":"model","label":"Installed Ollama model","type":"text","default":"qwen3:14b"},{"key":"temperature","label":"Temperature","type":"number","default":0.2}]},
+    {"id": "piper", "label": "Piper · English voices", "capability": "synthesis", "module": "piper", "environment": "piper", "description": "Fast local speech synthesis. Supply an English .onnx voice and matching .onnx.json file. Does not clone voices.", "fields": [{"key":"model","label":"Voice .onnx path","type":"text","default":"runtime/models/piper/en_US-lessac-medium.onnx"},{"key":"speaker_id","label":"Voice index","type":"number","default":0}]},
     {"id": "xtts", "label": "XTTS v2 · reference voice", "capability": "synthesis", "module": "TTS", "environment": "xtts", "description": "Cross-language reference-conditioned speech. Requires a speaker reference, local model directory, and separately installed coqui-tts.", "fields": [{"key":"model","label":"Local XTTS model directory","type":"text","default":""},{"key":"device","label":"Device","type":"select","options":["cuda","cpu"],"default":"cuda"}]},
 ]
 
@@ -29,6 +30,12 @@ def interpreter(adapter):
         return configured
     venv = ROOT / ".workers" / env
     path = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    if os.name == "nt" and path.exists():
+        config = venv / "pyvenv.cfg"
+        text = config.read_text(encoding="utf-8-sig").replace("\\", "/").casefold() if config.exists() else ""
+        managed = str(ROOT / "runtime" / "python").replace("\\", "/").casefold()
+        if managed not in text:
+            raise RuntimeError("This worker uses an older system Python. Rerun its model installer to migrate it into the app folder.")
     return str(path) if path.exists() else sys.executable
 
 
@@ -36,19 +43,19 @@ def module_available(adapter):
     module = adapter.get("module")
     if not module:
         return True
-    py = interpreter(adapter)
     try:
+        py = interpreter(adapter)
         if py == sys.executable:
             return importlib.util.find_spec(module) is not None
-        result = subprocess.run([py, "-c", "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec(sys.argv[1]) else 1)", module], capture_output=True, timeout=15)
+        result = subprocess.run([py, "-c", "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec(sys.argv[1]) else 1)", module], capture_output=True, env=runtime_environment(python=py), timeout=15)
         return result.returncode == 0
-    except (ImportError, ModuleNotFoundError, OSError, subprocess.TimeoutExpired):
+    except (ImportError, ModuleNotFoundError, OSError, RuntimeError, subprocess.TimeoutExpired):
         return False
 
 
 def local_json(path, payload=None, timeout=10):
     # Never send dialogue to a remote provider; local Ollama only.
-    req = urllib.request.Request("http://127.0.0.1:11434" + path, data=json.dumps(payload).encode() if payload is not None else None, headers={"Content-Type":"application/json"})
+    req = urllib.request.Request(ollama_url() + path, data=json.dumps(payload).encode() if payload is not None else None, headers={"Content-Type":"application/json"})
     with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req, timeout=timeout) as response:
         return json.load(response)
 

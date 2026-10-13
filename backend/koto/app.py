@@ -22,6 +22,7 @@ from .jobs import Jobs, signature
 from .media import binary, parse_subtitles, probe
 from .registry import Registry
 from .store import DATA, ROOT, Store
+from .runtime import executable
 
 
 class NewProject(BaseModel):
@@ -121,7 +122,7 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
         jobs.closed.set()
         await run_in_threadpool(jobs.thread.join, 15)
 
-    app = FastAPI(title="KOTO Studio",version="0.1.0",lifespan=lifespan)
+    app = FastAPI(title="KOTO Studio",version="0.2.0",lifespan=lifespan)
     app.state.store,app.state.jobs,app.state.registry = store,jobs,registry
     app.add_middleware(TrustedHostMiddleware,allowed_hosts=["localhost","127.0.0.1","testserver","tauri.localhost"])
     app.add_middleware(CORSMiddleware,allow_origins=["http://localhost:5173","http://127.0.0.1:5173","http://localhost:8765","http://127.0.0.1:8765","tauri://localhost","http://tauri.localhost"],allow_methods=["GET","POST","PATCH"],allow_headers=["Content-Type"])
@@ -171,7 +172,10 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
     async def health():
         def inspect():
             gpu = None
-            smi = shutil.which("nvidia-smi")
+            try:
+                smi = executable("nvidia-smi")
+            except RuntimeError:
+                smi = None
             if smi:
                 try:
                     result = subprocess.run([smi,"--query-gpu=name,memory.total,driver_version","--format=csv,noheader,nounits"],capture_output=True,text=True,timeout=4)
@@ -180,7 +184,14 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
                         gpu = {"name":row[0].strip(),"vram_mb":int(row[1]),"driver":row[2].strip()}
                 except (OSError,ValueError,IndexError,subprocess.TimeoutExpired):
                     pass
-            return {"version":"0.1.0","local":True,"ffmpeg":bool(shutil.which("ffmpeg")),"ffprobe":bool(shutil.which("ffprobe")),"gpu":gpu}
+            available = {}
+            for name in ("ffmpeg","ffprobe"):
+                try:
+                    executable(name)
+                    available[name] = True
+                except RuntimeError:
+                    available[name] = False
+            return {"version":"0.2.0","local":True,**available,"gpu":gpu}
         return await run_in_threadpool(inspect)
 
     @app.get("/api/models")

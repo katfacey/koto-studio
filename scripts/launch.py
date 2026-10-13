@@ -11,6 +11,8 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
+from runtime_services import runtime_environment
+
 ROOT = Path(__file__).resolve().parents[1]
 URL = "http://127.0.0.1:8765"
 
@@ -19,7 +21,8 @@ def health():
     try:
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         with opener.open(URL + "/api/health",timeout=2) as response:
-            return json.load(response).get("local") is True
+            result = json.load(response)
+            return result.get("local") is True and result.get("version") == "0.2.0"
     except Exception:
         return False
 
@@ -40,10 +43,9 @@ def main():
     already = health()
     proc = None
     if not already:
-        env = dict(os.environ)
-        env["PYTHONPATH"] = str(ROOT/"backend")
-        proc = subprocess.Popen([sys.executable,"-m","uvicorn","koto.app:app","--host","127.0.0.1","--port","8765"],cwd=ROOT,env=env)
-        for _ in range(100):
+        env = runtime_environment()
+        proc = subprocess.Popen([sys.executable,str(ROOT/"scripts"/"serve.py")],cwd=ROOT,env=env)
+        for _ in range(400):
             if proc.poll() is not None:
                 raise SystemExit("Backend exited. Check its output above; port 8765 may already be in use.")
             if health():

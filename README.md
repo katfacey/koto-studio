@@ -1,43 +1,78 @@
-# KOTO Studio · v0.1.0
+# KOTO Studio · v0.2.0
 
-A local Japanese-to-English dubbing editor for **Windows + NVIDIA**, designed
-around an RTX 5090 with 32 GB VRAM. The first release includes a working media,
-dialogue, voice, job, and export workflow. Its editor uses native browser modules
-and needs no Node/npm installation. Python runs the local backend; optional AI
-workers have separate environments.
+A local Japanese-to-English dubbing editor for **Windows x64 + NVIDIA**, designed
+around an RTX 5090 with 32 GB VRAM. KOTO installs and runs its own Python, FFmpeg,
+model environments, and optional local translation runtime inside the app folder.
 
-## Start on Windows
+**[Pinokio installation guide](PINOKIO.md)** ·
+**[Download the complete ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)**
 
-1. Install **Python 3.11** from [python.org](https://www.python.org/downloads/),
-   including the Windows Python launcher. Python 3.12 also works for the core.
-2. Install FFmpeg, for example `winget install --id Gyan.FFmpeg -e`. Open a new
-   terminal afterward and check that `ffmpeg -version` and `ffprobe -version`
-   work. FFmpeg must include H.264/AAC encoding.
-3. Extract the archive into a writable folder, such as `C:\KOTO Studio`.
-4. Double-click **Install.cmd**, then **Start.cmd**.
+## Standalone installation
 
-The app opens at `http://127.0.0.1:8765`. Keep its terminal open; Ctrl+C stops it.
-The service binds to loopback. Installation downloads core Python packages;
-processing is local. Model weights are not bundled.
+1. Download and extract the **whole ZIP** into a writable folder, such as
+   `C:\KOTO Studio`. Close an older KOTO session before upgrading.
+2. Double-click **Install.cmd**. It downloads verified UV and FFmpeg archives,
+   installs private Python 3.11, and builds the core environment. It neither
+   changes your system PATH nor registers Python as a system installation.
+3. Double-click **Start.cmd**. Start also bootstraps the core if it is missing.
+4. Use **Install-Models.cmd** to select optional voice/audio workers. For local
+   translation, use **Install-Translation.cmd** or the translation choice in
+   that menu. Restart KOTO after adding optional runtimes.
 
-Optional native window:
+You do not need to install Python, FFmpeg, Node/npm, Ollama, or a CUDA toolkit
+before running these installers. The host requirements are Windows 10/11 x64,
+a browser, a compatible NVIDIA driver for GPU inference, internet for initial
+package/model downloads, and enough disk space.
 
-```powershell
-.venv\Scripts\python -m pip install pywebview
-.venv\Scripts\python scripts\launch.py --desktop
-```
+This is **self-contained after setup**, rather than an offline archive containing
+all binaries and every model. The release ZIP includes source and built UI;
+installation downloads the runtime files into the app directory. Basic voices
+and freely downloadable weights can be installed/downloaded there. Gated models
+and optional reference-voice checkpoints still need local provisioning.
 
-This is a source-based application with launchers, not a signed standalone EXE.
-Native window mode uses pywebview and may require Microsoft Edge WebView2.
+The browser editor opens at `http://127.0.0.1:8765`. Keep the standalone terminal
+open; Ctrl+C stops the server and its owned translation process. Pinokio manages
+that server from its own Start entry. This is not a signed standalone EXE.
 
-## Pinokio
+## Pinokio installer
 
-Import this local application folder using your Pinokio version's local-app or
-developer workflow. `pinokio.js`, `install.js`, and `start.js` provide the menu,
-core installation, and server startup. The installer uses Pinokio's conda
-FFmpeg and its `env` Python environment. Optional worker installers appear in
-the menu. The scripts are supplied and syntax-checked; they have not been run
-inside Pinokio or on Windows in this build environment.
+Double-click **[Install-Pinokio.cmd](Install-Pinokio.cmd)** from the extracted ZIP
+and select your **Pinokio Home** folder (the folder containing `api`). It copies
+KOTO into `api\koto-studio` and bootstraps Python/FFmpeg there. Then open Pinokio
+**Downloaded → KOTO Studio → Start**.
+
+The full walkthrough is in **[PINOKIO.md](PINOKIO.md)**. Pinokio's own installer
+entry is **[install.js](install.js)**, with **[pinokio.js](pinokio.js)** providing
+the menu and **[start.js](start.js)** launching the app. All of them are included.
+They use the same managed bootstrap as the standalone launcher.
+
+## What stays inside the application folder
+
+| Location | Contents |
+| --- | --- |
+| `runtime/uv/` | Pinned, checksum-verified bootstrap executable |
+| `runtime/python/` | Private managed Python installation |
+| `runtime/ffmpeg/bin/` | Private FFmpeg, ffprobe, and companion files |
+| `.venv/` | Core backend packages |
+| `.workers/<worker>/` | Isolated AI environments and CUDA runtime libraries |
+| `runtime/cache/` | Python package, Hugging Face, and Torch caches |
+| `runtime/models/piper/` | Downloaded English voice and matching config |
+| `runtime/ollama/` | Optional portable Ollama runtime |
+| `runtime/models/ollama/` | Local translation weights |
+| `runtime/logs/` | Translation server logs |
+| `data/` | Projects, source media, takes, stems, and renders |
+
+Application launches use explicit executable paths. FFmpeg lookups on Windows
+require the managed binaries and do not silently use a system installation.
+Model processes receive their own FFmpeg and CUDA library search directories;
+no user/system PATH changes are made. NVIDIA tools and process cancellation use
+known Windows system/driver locations. An external PATH fallback is available
+only for Linux development or explicit developer opt-in.
+
+Installers preserve project data. When migrating an older version, system-Python
+virtual environments are recreated against the private Python. After moving the
+installed folder, rerun Install.cmd and the optional profiles you use to repair
+virtual-environment paths; installed environments are not assumed relocatable.
 
 ## Complete a project
 
@@ -78,44 +113,48 @@ clearly labeled artwork/waveforms. It has no source video or generated voice
 takes. No inference is simulated. A complete manual dub is possible without AI
 workers by importing subtitles and replacement takes.
 
-## Install optional workers
+## Optional model installers
 
-From the application folder:
+**Install-Models.cmd** presents these choices:
+
+| Choice | Installs | Additional setup |
+| --- | --- | --- |
+| Default dubbing workers | Demucs, Pyannote package, Faster Whisper, Piper + English voice | Gated diarization pipeline still needs provisioning; recognition/separation weights download on first use. |
+| XTTS | Reference-conditioned voice worker | Supply a local XTTS v2 model directory and a speaker reference. |
+| Local translation | Private Ollama + Qwen3 14B | No system Ollama service needed. |
+| All | All workers and local translation | Still provision gated/XTTS checkpoint files as needed. |
+
+The same choices and individual worker installers appear in Pinokio. Torch
+2.7.1/torchaudio 2.7.1 CUDA 12.8 wheels supply GPU libraries. The Whisper worker
+also gets those local cuBLAS/cuDNN libraries; no separate CUDA toolkit or DLL
+PATH setup is required by the managed installer. GPU compatibility is checked
+with `scripts/check_gpu.py` during installation, but inference still depends on
+model compatibility and your NVIDIA driver.
+
+Piper setup downloads the English Lessac medium voice and config from one
+immutable Hugging Face revision, verifies the ONNX LFS checksum, and selects
+`runtime/models/piper/en_US-lessac-medium.onnx` by default for new projects.
+Existing projects with an empty/old voice path can select that path in Model
+manager. Piper does not clone voices. XTTS can use speaker reference samples.
+
+Ollama runs at **127.0.0.1:11435**, separate from the conventional system Ollama
+port. Start automatically launches the app-owned runtime when installed and
+stops only the process it started. Installation stores weights under
+`runtime/models/ollama`. To install another local translation model:
 
 ```powershell
-powershell -File scripts/install-model.ps1 -Model whisper
-powershell -File scripts/install-model.ps1 -Model audio
-powershell -File scripts/install-model.ps1 -Model piper
-powershell -File scripts/install-model.ps1 -Model xtts
+& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile translation -TranslationModel "qwen3:8b"
 ```
 
-Install only what you intend to use. These scripts use separate Python 3.11
-environments. The audio/XTTS installers use CUDA 12.8 PyTorch wheels and run a
-GPU architecture/matrix check. They do not download voice weights or gated
-pyannote pipelines. Click **Refresh status** in Model manager after installation.
-They pin PyTorch/torchaudio 2.7.1 and pyannote 3.x to avoid newer audio I/O
-dependencies being introduced into the baseline worker environments.
+Set the same model name in Model manager. Local inference is the default; cloud
+models are not installed by this setup. The queue runs one processing job at a
+time and releases model workers between stages. Ollama uses `keep_alive: 0`.
 
-| Adapter | Required setup |
-| --- | --- |
-| Demucs | Audio worker; defaults to `htdemucs`. First use downloads its weights. |
-| Faster Whisper | Whisper worker; `large-v3`, another supported model, or a local model directory. First use of a model name downloads weights. |
-| Pyannote | Audio worker; locally provisioned pipeline YAML and local weights. Obtain any gated models through their own setup process, then configure local paths. |
-| Ollama | Install [Ollama](https://ollama.com/), run `ollama pull qwen3:14b`, and keep the local service running on port 11434. Choose an installed model in Model manager. |
-| Piper | Piper worker; English `.onnx` voice plus matching `.onnx.json` from a compatible [Piper voice distribution](https://huggingface.co/rhasspy/piper-voices). Set the full local `.onnx` path. Does not clone voices. |
-| XTTS v2 | XTTS worker; local model folder with `config.json`, `model.pth`, `vocab.json`, and required auxiliary files. Set its directory and attach a speaker reference. |
-| RVC / other converters | Provide a distribution-specific worker through [models/README.md](models/README.md). RVC converts synthesized speech; it is not TTS. |
-
-**GPU compatibility is not verified on an RTX 5090 here.** PyTorch must support
-Blackwell `sm_120`; old wheels bundled with model projects may not. Faster
-Whisper uses CTranslate2, not PyTorch, and CUDA execution on Windows needs
-compatible CUDA 12 cuBLAS and cuDNN 9 DLLs available on PATH; inspect its current
-installation requirements. Choose CPU/int8 while diagnosing that setup.
-
-The single-worker queue releases model processes between stages. Ollama uses
-`keep_alive: 0`. The 32 GB VRAM target provides room for substantial audio and
-translation models but does not guarantee compatibility with every model.
-Cloud inference adapters are not included in this release.
+Core downloads are a few hundred MB plus installed files. Default GPU workers
+require several GB; local translation needs roughly 12 GB including its runtime
+and Qwen3 14B. Allow roughly 20+ GB for all runtimes, plus source media, PCM stems,
+and intermediate renders. Download sizes vary with upstream package versions.
+Model files are not committed to GitHub.
 
 ## Project data and extensibility
 
@@ -141,34 +180,41 @@ GPU inference has passed.
 
 ## Development and verification
 
+On a managed Windows installation:
+
+```powershell
+& ".\runtime\uv\uv.exe" --no-config pip install --python ".\.venv\Scripts\python.exe" -r backend\requirements-dev.txt
+& ".\.venv\Scripts\python.exe" -m unittest discover -s backend\tests -v
+```
+
+Linux development can use an explicit Python environment and installed FFmpeg:
+
 ```bash
-python -m venv .venv
-# Activate .venv using your platform's command.
 python -m pip install -r backend/requirements-dev.txt
 python scripts/build_frontend.py
-python -m uvicorn koto.app:app --app-dir backend --host 127.0.0.1 --port 8765
+python scripts/serve.py
 python -m unittest discover -s backend/tests -v
 ```
 
-Node is optional and can syntax-check browser modules with
-`node --check frontend/src/app.js`. `node frontend/check-ui.mjs` runs renderer
-and action smoke checks with a minimal DOM harness, including text escaping,
-dialogue saving, speaker creation, and model configuration. It does not test
-browser playback or visual layout. API documentation is at `/docs`.
+Node is optional for development checks:
+`node frontend/check-ui.mjs` and `node scripts/check-pinokio.mjs`.
+API documentation is at `/docs`. The Windows GitHub Actions workflow exercises
+core installation and the HTTP/media tests with PATH limited to Windows System32.
+See [VALIDATION.md](VALIDATION.md) and the repository's Actions tab for results.
+GPU inference, native-window behavior, and Pinokio-hosted UI still need validation
+on the actual target machine.
 
-Validated in Linux with real FFmpeg: import/extract/preview, subtitle alignment,
-manual voice takes, rendered duration and audio placement, MKV/English stream
-metadata, asset range requests, persistence, cancelled process trees, revision
-conflicts, and generated-take invalidation. Test-only workers exercise the
-extension protocol. GPU model inference, Windows installation, native-window
-startup, and Pinokio execution remain unverified. Chromium visual validation was
-blocked by this execution sandbox's socket restrictions.
+Optional native window uses pywebview and Windows WebView2. Install pywebview into
+the private core environment using its UV executable, then launch
+`.venv\Scripts\python.exe scripts\launch.py --desktop`. Browser mode has no
+additional native-window dependency.
 
-## Scope of v0.1
+## Scope
 
-This is a usable dubbing foundation, not a replacement for a mature NLE. It
-does not include video inpainting, sexual-content uncensoring, lip sync,
-automatic OCR, speaker-overlap source separation, a pretrained RVC bundle,
-multi-channel spatial mixing, a signed installer, or hosted model processing.
-Subtitles are matched by time overlap; dedicated forced alignment and automatic
-translation repair loops remain later work.
+This release is a dubbing foundation, not a mature NLE. It does not include
+video inpainting, sexual-content uncensoring, automatic lip sync or OCR,
+speaker-overlap source separation, a pretrained RVC bundle, multi-channel spatial
+mixing, a signed installer, or hosted model processing. Subtitles match by time
+overlap; dedicated forced alignment and automatic translation repair loops remain
+later work. Custom model adapters, including RVC/UVR bridges, use the protocol in
+[models/README.md](models/README.md).

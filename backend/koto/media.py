@@ -2,19 +2,15 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import subprocess
 import uuid
 from pathlib import Path
 
+from .runtime import executable
+
 
 def binary(name):
-    import os
-    # FFmpeg may be on PATH or supplied by Pinokio's conda tools.
-    path = os.environ.get("KOTO_" + name.upper()) or shutil.which(name)
-    if not path:
-        raise RuntimeError(f"{name} is not installed. Install FFmpeg and add its bin folder to PATH.")
-    return path
+    return executable(name)
 
 
 def probe(path: Path):

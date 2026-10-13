@@ -11,6 +11,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from runtime import configure_process
+configure_process()
+
 
 def progress(value, message):
     print("KOTO_EVENT " + json.dumps({"progress": value, "message": message}), flush=True)

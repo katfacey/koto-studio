@@ -15,23 +15,25 @@ import httpx
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from koto.app import create_app
 from koto.jobs import signature
-from koto.media import parse_subtitles, probe
+from koto.media import binary, parse_subtitles, probe
 from koto.store import Store
 
 
 class WorkflowTests(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
-        if not shutil.which("ffmpeg"):
+        try:
+            ffmpeg = binary("ffmpeg")
+        except RuntimeError:
             raise unittest.SkipTest("FFmpeg is required for integration tests")
         cls.fixture = tempfile.TemporaryDirectory()
         cls.files = Path(cls.fixture.name)
         cls.sub = cls.files/"source.srt"
         cls.sub.write_text("1\n00:00:00,500 --> 00:00:01,500\nHello there.\n\n2\n00:00:02,000 --> 00:00:03,500\nLet's catch the train.\n",encoding="utf-8")
         cls.video = cls.files/"source.mkv"
-        subprocess.run(["ffmpeg","-y","-v","error","-f","lavfi","-i","testsrc2=size=160x90:rate=24:duration=4","-f","lavfi","-i","sine=frequency=180:sample_rate=48000:duration=4","-i",str(cls.sub),"-map","0:v","-map","1:a","-map","2:s","-c:v","libx264","-preset","ultrafast","-c:a","pcm_s16le","-ac","2","-c:s","srt","-metadata:s:a:0","language=jpn","-metadata:s:s:0","language=eng","-t","4",str(cls.video)],check=True)
+        subprocess.run([ffmpeg,"-y","-v","error","-f","lavfi","-i","testsrc2=size=160x90:rate=24:duration=4","-f","lavfi","-i","sine=frequency=180:sample_rate=48000:duration=4","-i",str(cls.sub),"-map","0:v","-map","1:a","-map","2:s","-c:v","libx264","-preset","ultrafast","-c:a","pcm_s16le","-ac","2","-c:s","srt","-metadata:s:a:0","language=jpn","-metadata:s:s:0","language=eng","-t","4",str(cls.video)],check=True)
         cls.take = cls.files/"voice.wav"
-        subprocess.run(["ffmpeg","-y","-v","error","-f","lavfi","-i","sine=frequency=440:sample_rate=48000:duration=0.8","-ac","2",str(cls.take)],check=True)
+        subprocess.run([ffmpeg,"-y","-v","error","-f","lavfi","-i","sine=frequency=440:sample_rate=48000:duration=0.8","-ac","2",str(cls.take)],check=True)
 
     @classmethod
     def tearDownClass(cls):
