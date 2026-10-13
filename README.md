@@ -7,6 +7,9 @@ model environments, and optional local translation runtime inside the app folder
 **[Pinokio installation guide](PINOKIO.md)** ·
 **[Download the complete ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)**
 
+[Windows bootstrap and Pinokio folder installer verified](https://github.com/katfacey/koto-studio/actions/runs/38351990802)
+with only Windows System32 on PATH.
+
 ## Standalone installation
 
 1. Download and extract the **whole ZIP** into a writable folder, such as

@@ -1,6 +1,9 @@
 # Release validation · v0.2.0 · 2026-10-13
 
-Environment: Linux, Python 3.12, FFmpeg 7.1.5, Node 24.
+Local checks: Linux, Python 3.12, FFmpeg 7.1.5, Node 24.
+Windows checks: GitHub-hosted Windows, managed Python 3.11, bundled FFmpeg 9.0.2.
+
+**[Windows installation and Pinokio folder setup passed](https://github.com/katfacey/koto-studio/actions/runs/38351990802).**
 
 The following checks passed:
 
@@ -30,23 +33,24 @@ output is represented as tested inference. Actual Demucs, Whisper, Pyannote,
 Piper, XTTS, Ollama, and third-party RVC execution require their packages,
 configured weights, and a compatible host. They were not installed/executed here.
 
-The new Windows GitHub Actions workflow parses PowerShell installers, installs
+The passing Windows GitHub Actions workflow parses PowerShell installers, installs
 the core with PATH restricted to Windows System32, asserts that Python/FFmpeg are
-app-owned, runs the 17 tests, and starts the actual server/editor. Its live status
-is available in the repository's Actions tab. Windows bootstrap execution was
-not available locally in this Linux workspace.
+app-owned, runs the 17 tests, and starts the actual server/editor. It also executes
+the Pinokio folder installer using a Home path with spaces, verifies that the
+copied application is bootstrapped, and reinstalls it while preserving a project
+data fixture. This tests the installer without requiring the Pinokio desktop UI.
 
 Chromium launches failed because the execution sandbox denies its required
-socket operations. Browser visual layout, video playback, Windows PowerShell
-installation, native pywebview mode, Pinokio installation, and RTX 5090 inference
+socket operations. Browser visual layout/playback, native pywebview mode,
+the Pinokio desktop UI, optional GPU package installation, and RTX 5090 inference
 have not been validated. The archive includes setup instructions and a CUDA
 architecture/matrix diagnostic for the target machine.
 
 Run checks again on the target host:
 
 ```powershell
-.\runtime\uv\uv.exe --no-config pip install --python .\.venv\Scripts\python.exe -r backend/requirements-dev.txt
-.venv\Scripts\python -m unittest discover -s backend/tests -v
+& ".\runtime\uv\uv.exe" --no-config pip install --python ".\.venv\Scripts\python.exe" -r backend/requirements-dev.txt
+& ".\.venv\Scripts\python.exe" -m unittest discover -s backend/tests -v
 # Optional Node checks:
 node frontend/check-ui.mjs
 node scripts/check-pinokio.mjs
