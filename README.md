@@ -6,7 +6,7 @@ model environments, and optional local translation runtime inside the app folder
 
 **[Download the complete ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)**
 
-[Windows standalone bootstrap verified](https://github.com/katfacey/koto-studio/actions/runs/38351990802)
+[Windows standalone bootstrap verified](https://github.com/katfacey/koto-studio/actions/runs/38352693802)
 with only Windows System32 on PATH.
 
 ## Standalone installation

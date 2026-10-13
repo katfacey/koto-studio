@@ -3,7 +3,7 @@
 Local checks: Linux, Python 3.12, FFmpeg 7.1.5, Node 24.
 Windows checks: GitHub-hosted Windows, managed Python 3.11, bundled FFmpeg 9.0.2.
 
-**[Windows standalone installation passed](https://github.com/katfacey/koto-studio/actions/runs/38351990802).**
+**[Windows standalone installation passed](https://github.com/katfacey/koto-studio/actions/runs/38352693802).**
 
 The following checks passed:
 
