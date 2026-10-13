@@ -74,7 +74,7 @@ function Install-ArchiveTool([string]$Name, $Release, [string]$ExecutableName, [
 Install-ArchiveTool "uv" $Manifest.uv "uv.exe" (Join-Path $RuntimeDir "uv")
 $UvExe = Join-Path $RuntimeDir "uv\uv.exe"
 Invoke-Checked $UvExe @("--no-config", "python", "install", "--no-bin", "--no-registry", $Manifest.python)
-$PythonOutput = & $UvExe --no-config python find --system --managed-python $Manifest.python
+$PythonOutput = & $UvExe --no-config python find --system $Manifest.python
 if ($LASTEXITCODE -ne 0) { throw "Managed Python could not be located" }
 $ManagedPython = ($PythonOutput | Select-Object -Last 1).Trim()
 if (-not (Test-Path -LiteralPath $ManagedPython)) { throw "Managed Python is missing: $ManagedPython" }
