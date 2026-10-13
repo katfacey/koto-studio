@@ -28,7 +28,7 @@ class DiarizationSetupTests(unittest.TestCase):
 
     def test_downloads_pin_revisions_and_local_config_contains_no_remote_model_or_token(self):
         with tempfile.TemporaryDirectory(prefix="KOTO speakers 日本語 ") as tmp:
-            destination = Path(tmp)
+            destination = Path(tmp).resolve()
             secret = "fixture-read-token-not-a-real-credential"
             calls = []
             template = {"version": "3.1.0", "pipeline": {"name": "pyannote.audio.pipelines.SpeakerDiarization", "params": {"segmentation": "pyannote/segmentation-3.0", "embedding": "pyannote/wespeaker-voxceleb-resnet34-LM", "use_auth_token": secret}}, "params": {"clustering": {"threshold": .7}}}
