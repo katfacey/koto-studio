@@ -157,7 +157,8 @@ root.addEventListener('input',e=>{
     else if(key.startsWith('settings.')){const prop=key.slice(9);if(prop.endsWith('_stream'))v=v===''?null:Number(v);p.settings[prop]=v;}
     else if(key.startsWith('adapter.')){const cap=key.slice(8),m=S.models.find(m=>m.id===v);p.models[cap]={id:v,settings:Object.fromEntries((m.fields??[]).map(f=>[f.key,f.default]))};redraw=true;}
     else if(key.startsWith('model.')){const [,cap,prop]=key.split('.');p.models[cap].settings[prop]=v;}
-  },redraw);
+  });
+  if(redraw)render();
   refreshTiming();const auto=$('[data-field="line.auto_fit"]');if(auto)auto.checked=line()?.auto_fit!==false&&S.p.settings.fit_duration!==false;
   const generate=$('[data-act="generate-line"]');if(generate)generate.disabled=!line()?.translation;
   if(el.type==='range'&&key!=='zoom'){const label=el.closest('label')?.querySelector('strong');if(label)label.textContent=`${Math.round(v*100)}%`;}
