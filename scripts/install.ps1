@@ -138,7 +138,9 @@ function Install-StudioWorker([string]$Worker) {
         Get-Download "$BaseUrl/$VoiceName" (Join-Path $VoiceDir $VoiceName) $VoiceHash
         $ConfigPath = Join-Path $VoiceDir "$VoiceName.json"
         Invoke-WebRequest -UseBasicParsing -Uri "$BaseUrl/$VoiceName.json" -OutFile $ConfigPath
-        Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json | Out-Null
+        # Phoneme keys are Unicode and case-sensitive; Windows PowerShell's JSON
+        # object conversion can reject valid keys, and Get-Content defaults to ANSI.
+        Invoke-Checked $CorePython @("-c", "import json, pathlib, sys; json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))", $ConfigPath)
         @{revision=$Revision;sha256=$VoiceHash;voice=$VoiceName} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $VoiceDir "source.json") -Encoding UTF8
     }
 }

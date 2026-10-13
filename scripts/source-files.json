@@ -37,6 +37,7 @@
   "scripts/build_frontend.py",
   "scripts/check-installers.ps1",
   "scripts/check_gpu.py",
+  "scripts/check_piper.py",
   "scripts/install-model.ps1",
   "scripts/install.ps1",
   "scripts/launch.py",
