@@ -85,13 +85,16 @@ def run(request):
             voice.synthesize_wav(request["text"], f, syn_config=SynthesisConfig(speaker_id=int(settings.get("speaker_id", 0))))
         return {"audio": str(path)}
     if adapter == "xtts":
+        import os
+        # Official XTTS checkpoints contain config classes predating Torch 2.6.
+        os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
         import torch
         from TTS.tts.configs.xtts_config import XttsConfig
         from TTS.tts.models.xtts import Xtts
         import soundfile as sf
-        directory = Path(settings.get("model", ""))
+        directory = Path(settings.get("model") or "runtime/models/xtts")
         if not (directory / "config.json").is_file():
-            raise ValueError("Configure a local XTTS directory containing config.json, model.pth, and vocab.json")
+            raise ValueError("Run Install-Reference-Voices.cmd, or configure a local XTTS directory containing config.json, model.pth, and vocab.json")
         reference = request.get("reference")
         if not reference or not Path(reference).is_file():
             raise ValueError("This speaker needs a reference audio sample")

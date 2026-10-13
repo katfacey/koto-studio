@@ -73,3 +73,13 @@ Voice conversion runs **after TTS and before timing normalization**. It can be
 selected at project level, or overridden for an individual speaker. KOTO does
 not ship an RVC model or a universal RVC wrapper; supply the bridge for the RVC
 distribution you use. UVR/BS-RoFormer models use the same separation protocol.
+
+Reference-capable synthesis adapters declare `"supports_reference": true` in the
+manifest. Their `reference` request path is either an uploaded speaker sample or
+KOTO's original-dialogue reference, depending on the speaker checkbox.
+
+Translation adapters can declare `"supports_alternatives": true`. They then receive
+`mode: "alternatives"`, `line`, `context`, `source`, `subtitle_reference`,
+`current_translation`, `target_seconds`, and `approximate_word_budget` for one clip,
+and return `{"alternatives":["Concise wording", "Near-target wording", "Fuller wording"]}`.
+Suggestions never replace the adaptation automatically.

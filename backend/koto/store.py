@@ -63,7 +63,7 @@ class Store:
         project = {
             "id": pid, "name": name[:120], "revision": 1, "demo": demo,
             "media": None, "assets": {}, "dialogue": [],
-            "speakers": [{"id": "speaker-1", "name": "Speaker 01", "color": "#8b8aff", "voice": {}, "reference": None}],
+            "speakers": [{"id": "speaker-1", "name": "Speaker 01", "color": "#8b8aff", "voice": {}, "reference": None, "muted": False, "use_source_reference": False}],
             "models": {
                 "separation": {"id": "demucs", "settings": {"model": "htdemucs", "device": "cuda"}},
                 "transcription": {"id": "faster-whisper", "settings": {"model": "large-v3", "device": "cuda", "compute_type": "float16"}},
@@ -71,10 +71,10 @@ class Store:
                 "translation": {"id": "ollama", "settings": {"model": "qwen3:14b", "temperature": 0.2}},
                 "synthesis": {"id": "piper", "settings": {"model": "runtime/models/piper/en_US-lessac-medium.onnx", "speaker_id": 0}},
             },
-            "settings": {"audio_stream": None, "video_stream": None, "subtitle_stream": None, "background_gain": 0.8, "dialogue_gain": 1.0, "fit_duration": True, "output": "mkv", "background_mode": "separated"},
+            "settings": {"audio_stream": None, "video_stream": None, "subtitle_stream": None, "background_gain": 0.8, "dialogue_gain": 1.0, "fit_duration": True, "output": "mkv", "background_mode": "separated", "original_muted": False, "background_muted": False, "video_visible": True, "subtitles_visible": True},
         }
         if demo:
-            project["speakers"].append({"id": "speaker-2", "name": "Speaker 02", "color": "#e8a96b", "voice": {}, "reference": None})
+            project["speakers"].append({"id": "speaker-2", "name": "Speaker 02", "color": "#e8a96b", "voice": {}, "reference": None, "muted": False, "use_source_reference": False})
             samples = [(1.0, 3.4, "speaker-1", "まだ雨が降っているね。", "It's still raining."), (4.0, 7.0, "speaker-2", "もうすぐ止むと思う。", "I think it'll stop soon."), (8.0, 10.6, "speaker-1", "次の電車を待とう。", "Let's wait for the next train."), (12.0, 15.0, "speaker-2", "ここで待っていよう。", "We'll wait right here.")]
             project["dialogue"] = [{"id": str(uuid.uuid4()), "start": a, "end": b, "speaker": s, "source": ja, "translation": en, "subtitle": en, "audio": None} for a,b,s,ja,en in samples]
             project["name"] = "After the rain · sample"

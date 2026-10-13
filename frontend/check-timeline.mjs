@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {moveClip,reorderSpeaker,toggleTrack,audibleLines} from './src/timeline-edit.js';
+import {monitoringPlan,createMonitor} from './src/monitor.js';
+const fixture=()=>({id:'project',media:{duration:20},speakers:[{id:'a'},{id:'b'},{id:'c'}],settings:{background_mode:'separated',fit_duration:true},assets:{original_audio:'raw',vocals:'vocals',background:'bg'},dialogue:[{id:'one',speaker:'a',start:2,end:4,audio:{asset:'voice',duration:2,kind:'generated'}},{id:'two',speaker:'b',start:5,end:7,audio:{asset:'imported',duration:2,kind:'imported'}}]});
+let p=fixture();assert(moveClip(p,'one','b'));assert.equal(p.dialogue[0].start,2);assert.equal(p.dialogue[0].audio,null);assert.equal(p.dialogue[0].source_start,2);
+assert(moveClip(p,'two','a',18.5));assert.equal(p.dialogue[1].start,18);assert.equal(p.dialogue[1].end,20);assert.equal(p.dialogue[1].audio.kind,'imported');assert.equal(p.dialogue[1].source_start,5);
+assert(!moveClip(p,'two','missing'));assert(reorderSpeaker(p,'c','a'));assert.deepEqual(p.speakers.map(s=>s.id),['c','a','b']);
+p=fixture();toggleTrack(p,'speaker','a');assert.deepEqual(audibleLines(p).map(l=>l.id),['two']);assert.deepEqual(monitoringPlan(p,3,'english').map(x=>x.asset),['bg']);assert.deepEqual(monitoringPlan(p,3,'original').map(x=>x.asset),['bg']);
+toggleTrack(p,'background');assert.deepEqual(monitoringPlan(p,3,'english'),[]);toggleTrack(p,'original');assert.deepEqual(monitoringPlan(p,5.5,'original'),[]);
+toggleTrack(p,'video');assert.equal(p.settings.video_visible,false);toggleTrack(p,'video');assert.equal(p.settings.video_visible,true);
+p=fixture();moveClip(p,'one','a',8);toggleTrack(p,'speaker','a');assert.deepEqual(monitoringPlan(p,3,'original').map(x=>x.asset),['bg']);assert.deepEqual(monitoringPlan(p,8.5,'english').map(x=>x.asset),['bg']);
+// A raw vocal stem cannot isolate simultaneous voices; an unmuted voice keeps that span audible.
+p.dialogue.push({id:'overlap',speaker:'b',start:2,end:4});assert.deepEqual(monitoringPlan(p,3,'original').map(x=>x.asset),['vocals','bg']);
+const audios=[];globalThis.Audio=class{constructor(src){this.src=src;this.paused=true;this.currentTime=0;audios.push(this);}play(){this.paused=false;return Promise.resolve();}pause(){this.paused=true;}load(){}removeAttribute(){}};
+const monitor=createMonitor(x=>x,err=>assert.fail(err));p=fixture();monitor.sync(p,3,'english',true,false);assert.equal(audios.length,2);assert.equal(audios[1].currentTime,1);assert(!audios[1].paused);
+toggleTrack(p,'speaker','a');monitor.sync(p,3,'english',true,false);assert(audios[1].paused);assert(!audios[0].paused);
+monitor.sync(p,3,'english',true,true);assert(audios.every(x=>x.paused));toggleTrack(p,'speaker','a');monitor.sync(p,3,'english',true,false);assert.equal(audios.length,2);assert(!audios[1].paused);monitor.stop();assert(audios.every(x=>x.paused));
+console.log('Timeline and monitor checks passed: reassignment, original timestamps, imported takes, lane order, mutes, overlaps and immediate live playback.');
+const {timingInfo,estimateSeconds,playbackRate}=await import('./src/timing.js');
+assert.equal(estimateSeconds('Wait here.'),.95);
+p=fixture();let l=p.dialogue[0];l.translation='Please wait here.';assert.equal(timingInfo(p,l).measured,true);
+delete l.audio;l.translation='One two three four five six seven eight nine ten eleven twelve.';assert.equal(timingInfo(p,l).status,'long');
+l.translation='Wait.';assert.equal(timingInfo(p,l).status,'short');
+l.audio={duration:2.2,asset:'take'};assert.equal(playbackRate(p,l,2.2),1.1);l.auto_fit=false;l.playback_rate=.9;assert.equal(playbackRate(p,l,2.2),.9);assert.equal(timingInfo(p,l).status,'long');
+console.log('Timing checks passed: estimates, short/long hints, measured takes and reversible manual/automatic speed.');

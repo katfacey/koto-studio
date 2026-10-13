@@ -82,7 +82,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & ".\.venv\Scripts\python.exe" scripts\check_piper.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Test real editor panel resizing and the Cancel icon in Chromium
+      - name: Repair a Piper environment pointing at a moved installation
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          Set-Content -LiteralPath .workers\piper\pyvenv.cfg -Value 'home = F:\old-koto\runtime\python\cpython'
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile piper
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ".\.venv\Scripts\python.exe" scripts\check_piper.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test timeline editing, track controls and voice selection in Chromium
         shell: pwsh
         run: |
           $env:PATH = "$env:SystemRoot\System32"
@@ -97,3 +106,28 @@ jobs:
         with:
           name: Windows-editor-screenshot
           path: KOTO Studio/runtime/validation/koto-editor.png
+
+  reference-voice-worker:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: KOTO Reference Studio
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: KOTO Reference Studio
+      - name: Install app-owned Piper and XTTS with Windows system-only PATH
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile piper
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile xtts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Generate real reference-conditioned English on CPU
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          & ".\.venv\Scripts\python.exe" scripts\check_reference_voice.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

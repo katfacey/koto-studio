@@ -17,7 +17,7 @@ BUILTINS = [
     {"id": "pyannote", "label": "Pyannote · local pipeline", "capability": "diarization", "module": "pyannote.audio", "environment": "audio", "description": "Run Install-Diarization.cmd to download weights with your Hugging Face account. Accept both model access agreements first. Blank paths use the app-managed pipeline; inference stays local.", "fields": [{"key":"model","label":"Local pipeline YAML","type":"text","default":"runtime/models/pyannote/pipeline.yaml"},{"key":"device","label":"Device","type":"select","options":["cuda","cpu"],"default":"cuda"}]},
     {"id": "ollama", "label": "Ollama · local LLM", "capability": "translation", "module": None, "environment": None, "description": "App-managed Ollama on 127.0.0.1:11435. Run Install-Translation.cmd.", "fields": [{"key":"model","label":"Installed Ollama model","type":"text","default":"qwen3:14b"},{"key":"temperature","label":"Temperature","type":"number","default":0.2}]},
     {"id": "piper", "label": "Piper · English voices", "capability": "synthesis", "module": "piper", "environment": "piper", "description": "Fast local speech synthesis. Supply an English .onnx voice and matching .onnx.json file. Does not clone voices.", "fields": [{"key":"model","label":"Voice .onnx path","type":"text","default":"runtime/models/piper/en_US-lessac-medium.onnx"},{"key":"speaker_id","label":"Voice index","type":"number","default":0}]},
-    {"id": "xtts", "label": "XTTS v2 · reference voice", "capability": "synthesis", "module": "TTS", "environment": "xtts", "description": "Cross-language reference-conditioned speech. Requires a speaker reference, local model directory, and separately installed coqui-tts.", "fields": [{"key":"model","label":"Local XTTS model directory","type":"text","default":""},{"key":"device","label":"Device","type":"select","options":["cuda","cpu"],"default":"cuda"}]},
+    {"id": "xtts", "supports_reference": True, "label": "XTTS v2 · reference voice", "capability": "synthesis", "module": "TTS", "environment": "xtts", "description": "Cross-language reference-conditioned speech. Run Install-Reference-Voices.cmd for app-owned XTTS weights and worker. Use original dialogue or an uploaded speaker sample.", "fields": [{"key":"model","label":"Local XTTS model directory","type":"text","default":"runtime/models/xtts"},{"key":"device","label":"Device","type":"select","options":["cuda","cpu"],"default":"cuda"}]},
 ]
 
 
@@ -35,7 +35,8 @@ def interpreter(adapter):
         text = config.read_text(encoding="utf-8-sig").replace("\\", "/").casefold() if config.exists() else ""
         managed = str(ROOT / "runtime" / "python").replace("\\", "/").casefold()
         if managed not in text:
-            raise RuntimeError("This worker uses an older system Python. Rerun its model installer to migrate it into the app folder.")
+            installer = {"piper": "Install-Piper.cmd", "xtts": "Install-Reference-Voices.cmd"}.get(env, "Install-Models.cmd")
+            raise RuntimeError(f"The {env} worker points outside the current app folder, possibly because the app was moved. Close KOTO, run {installer} in this folder to repair it, then restart.")
     return str(path) if path.exists() else sys.executable
 
 

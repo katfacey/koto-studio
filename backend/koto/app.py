@@ -64,6 +64,14 @@ def validate_project(p, registry):
         if not isinstance(s.get("id"),str) or s["id"] in speaker_ids:
             raise ValueError("Speaker IDs must be unique")
         speaker_ids.add(s["id"])
+        if not isinstance(s.get("muted", False), bool):
+            raise ValueError("Speaker mute must be true or false")
+        s.setdefault("muted", False)
+        if not isinstance(s.get("use_source_reference", False), bool):
+            raise ValueError("Original voice reference must be true or false")
+        s.setdefault("use_source_reference", False)
+        if s.get("source_reference") and (not isinstance(s["source_reference"], dict) or not isinstance(s["source_reference"].get("asset"), str)):
+            raise ValueError("Invalid original voice reference")
         s["name"] = str(s.get("name","Speaker"))[:80]
         if not re.fullmatch(r"#[0-9a-fA-F]{6}",s.get("color","")):
             raise ValueError("Invalid speaker color")
@@ -84,11 +92,17 @@ def validate_project(p, registry):
         ids.add(line["id"])
         line["start"] = number(line.get("start"),0,max_duration,"Start time")
         line["end"] = number(line.get("end"),line["start"]+0.02,max_duration+0.001,"End time")
+        if "source_start" in line or "source_end" in line:
+            line["source_start"] = number(line.get("source_start"),0,max_duration,"Original start time")
+            line["source_end"] = number(line.get("source_end"),line["source_start"]+.02,max_duration+.001,"Original end time")
         if line.get("speaker") not in speaker_ids:
             raise ValueError("Dialogue refers to an unknown speaker")
         for key in ("source","translation","subtitle"):
             if not isinstance(line.get(key,""),str) or len(line.get(key,""))>20000:
                 raise ValueError("Invalid dialogue text")
+        if not isinstance(line.get("auto_fit",True),bool):
+            raise ValueError("Automatic timing must be true or false")
+        line["playback_rate"] = number(line.get("playback_rate",1),.8,1.25,"Speech speed")
         line["gain"] = number(line.get("gain",1),0,4,"Line gain")
         if line.get("audio") and not isinstance(line["audio"].get("asset"),str):
             raise ValueError("Invalid dialogue audio")
@@ -97,6 +111,11 @@ def validate_project(p, registry):
         if not isinstance(selection.get("settings",{}),dict):
             raise ValueError("Invalid model settings")
     settings = p["settings"]
+    for key, default in (("original_muted", False), ("background_muted", False), ("video_visible", True), ("subtitles_visible", True)):
+        if not isinstance(settings.get(key, default), bool):
+            raise ValueError(f"{key} must be true or false")
+        settings.setdefault(key, default)
+    settings["estimated_speech_wpm"] = number(settings.get("estimated_speech_wpm",150),80,240,"Estimated speaking pace")
     for key in ("background_gain","dialogue_gain"):
         settings[key] = number(settings.get(key,1),0,2,key)
     if settings.get("output") not in ("mkv","mp4"):
@@ -229,6 +248,8 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
             for s in p["speakers"]:
                 if s.get("reference") and not store.asset(pid,s["reference"]).is_file():
                     raise ValueError("Speaker reference does not exist")
+                if s.get("source_reference") and not store.asset(pid,s["source_reference"]["asset"]).is_file():
+                    raise ValueError("Original voice reference does not exist")
             for line in p["dialogue"]:
                 prior = old.get(line["id"])
                 if line.get("audio") and (not prior or prior.get("audio")!=line["audio"]):

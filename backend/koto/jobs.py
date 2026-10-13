@@ -12,17 +12,20 @@ import uuid
 from pathlib import Path
 
 from .media import IMAGE_SUBTITLE_CODECS, atempo_factor, binary, parse_subtitles, probe, write_srt
-from .registry import interpreter, local_json
+from .registry import interpreter, local_json, module_available
 from .store import ROOT
 from .runtime import executable, runtime_environment
 from .diarization import require_pipeline
+from .timing import estimate_seconds, playback_rate, adaptation_signature
+from .references import reference_segments, reference_signature
 
 CAPABILITIES = {"separate":"separation", "transcribe":"transcription", "diarize":"diarization", "translate":"translation", "synthesize":"synthesis"}
 
 
 def signature(project, line):
     speaker = next((s for s in project["speakers"] if s["id"] == line["speaker"]), {})
-    content = [line.get("translation", ""), line["speaker"], speaker.get("voice", {}), speaker.get("reference"), project["models"].get("synthesis"),project["models"].get("voice_conversion")]
+    reference = ["source", reference_signature(project, line["speaker"])] if speaker.get("use_source_reference", False) else speaker.get("reference")
+    content = [line.get("translation", ""), line["speaker"], speaker.get("voice", {}), reference, project["models"].get("synthesis"),project["models"].get("voice_conversion")]
     return hashlib.sha256(json.dumps(content, sort_keys=True).encode()).hexdigest()
 
 
@@ -40,7 +43,7 @@ class Jobs:
         self.thread.start()
 
     def enqueue(self, pid, kind, options=None):
-        if kind not in {*CAPABILITIES, "prepare", "export"}:
+        if kind not in {*CAPABILITIES, "prepare", "export", "reference", "alternatives"}:
             raise ValueError("Unknown job type")
         project = self.store.get(pid)
         if not project["media"] and kind in ("prepare","separate","transcribe","diarize","export"):
@@ -61,6 +64,36 @@ class Jobs:
             self.registry.get(project["models"][cap]["id"], cap)
             if kind == "diarize" and project["models"][cap]["id"] == "pyannote":
                 require_pipeline(project["models"][cap].get("settings"))
+            if kind == "synthesize":
+                selected = (options or {}).get("line_ids")
+                ids = {l["speaker"] for l in project["dialogue"] if not selected or l["id"] in selected}
+                for speaker in project["speakers"]:
+                    if speaker["id"] not in ids:
+                        continue
+                    adapter = self.registry.get(speaker.get("voice", {}).get("adapter") or project["models"][cap]["id"], cap)
+                    # Validate moved/broken environments before launching a model process.
+                    interpreter(adapter)
+                    if not adapter.get("custom") and not module_available(adapter):
+                        installer = "Install-Reference-Voices.cmd" if adapter["id"] == "xtts" else "Install-Piper.cmd" if adapter["id"] == "piper" else "Install-Models.cmd"
+                        raise ValueError(f"The {adapter['label']} worker is missing or broken. Close KOTO, run {installer}, then restart.")
+                    if speaker.get("use_source_reference") and not adapter.get("supports_reference", False):
+                        raise ValueError("Original speaker references need XTTS or another reference-capable synthesis adapter. Piper uses fixed voices. Select XTTS in the speaker Voice tab and run Install-Reference-Voices.cmd.")
+                    if speaker.get("use_source_reference"):
+                        self.audio_source(project)
+                        reference_segments(project, speaker["id"])
+        if kind == "alternatives":
+            line = next((l for l in project["dialogue"] if l["id"] == (options or {}).get("line_id")), None)
+            if not line or not (line.get("source") or line.get("subtitle") or line.get("translation")):
+                raise ValueError("Select a dialogue line with source text or an English translation")
+            adapter = self.registry.get(project["models"]["translation"]["id"], "translation")
+            if adapter["id"] != "ollama" and not adapter.get("supports_alternatives"):
+                raise ValueError("This translation adapter does not support alternatives. Select local Ollama or a supports_alternatives adapter.")
+        if kind == "reference":
+            sid = (options or {}).get("speaker_id")
+            if not any(s["id"] == sid for s in project["speakers"]):
+                raise ValueError("Select a speaker before building an original reference")
+            self.audio_source(project)
+            reference_segments(project, sid)
         spec = {"project": project, "options": options or {}}
         jid = self.store.job_create(pid, kind, spec)
         self.queue.put((jid, pid, kind, spec))
@@ -236,6 +269,43 @@ class Jobs:
             raise ValueError("Run Prepare media first")
         return str(self.store.asset(p["id"],audio))
 
+    def source_reference(self, jid, project, speaker):
+        key = reference_signature(project, speaker["id"])
+        cached = speaker.get("source_reference")
+        if cached and cached.get("signature") == key and self.store.asset(project["id"], cached["asset"]).is_file():
+            return cached
+        source = self.audio_source(project)
+        segments = reference_segments(project, speaker["id"])
+        root = self.store.project_dir(project["id"])
+        work = root / ("reference_" + uuid.uuid4().hex)
+        work.mkdir()
+        clips = []
+        for i, (start, end) in enumerate(segments):
+            self.progress(jid, .05 + .3*i/len(segments), f"Building original reference for {speaker['name']}")
+            path = work / f"segment_{i}.wav"
+            self.ffmpeg(jid, root, "-ss", str(start), "-i", source, "-t", str(end-start), "-vn", "-ar", "22050", "-ac", "1", "-c:a", "pcm_s16le", path)
+            clips.append(path)
+        path = work / "reference.wav"
+        args = [item for clip in clips for item in ("-i", clip)]
+        graph = "".join(f"[{i}:a]" for i in range(len(clips))) + f"concat=n={len(clips)}:v=0:a=1[out]"
+        self.ffmpeg(jid, root, *args, "-filter_complex", graph, "-map", "[out]", "-c:a", "pcm_s16le", path)
+        duration = probe(path)["duration"]
+        if duration < 2.95:
+            raise ValueError("Original reference is too short. Review source dialogue timestamps or upload a clean sample.")
+        result = {"asset": path.relative_to(root).as_posix(), "duration": duration, "signature": key}
+        speaker["source_reference"] = result
+        def merge(p):
+            current = next((s for s in p["speakers"] if s["id"] == speaker["id"]), None)
+            if current and reference_signature(p, speaker["id"]) == key:
+                current["source_reference"] = result
+            return p
+        self.commit(jid, project["id"], merge)
+        return result
+
+    def reference(self, jid, project, options):
+        speaker = next(s for s in project["speakers"] if s["id"] == options["speaker_id"])
+        return self.source_reference(jid, project, speaker)
+
     def separate(self, jid, project, options):
         original = project["assets"].get("original_audio")
         if not original:
@@ -328,6 +398,36 @@ class Jobs:
         self.commit(jid,project["id"],merge)
         return {"lines":len(translated)}
 
+    def alternatives(self,jid,project,options):
+        line = next(l for l in project["dialogue"] if l["id"] == options["line_id"])
+        selection = project["models"]["translation"]
+        target = round(line["end"]-line["start"],2)
+        index = project["dialogue"].index(line)
+        context = [{"speaker":l["speaker"], "source":l.get("source",""), "translation":l.get("translation","")} for l in project["dialogue"][max(0,index-2):index+3]]
+        prompt = {"context":context,"source":line.get("source",""),"subtitle_reference":line.get("subtitle",""),"current_translation":line.get("translation",""),"target_seconds":target,"approximate_word_budget":round(target*project["settings"].get("estimated_speech_wpm",150)/60)}
+        self.progress(jid,.1,"Suggesting three timing-aware adaptations for one line")
+        if selection["id"] == "ollama":
+            root = self.store.project_dir(project["id"])
+            req,res = root/f"{jid}_alternatives_request.json",root/f"{jid}_alternatives_result.json"
+            req.write_text(json.dumps({"mode":"alternatives","model":selection["settings"].get("model","qwen3:14b"),"temperature":float(selection["settings"].get("temperature",.2)),"prompt":json.dumps(prompt,ensure_ascii=False)}),encoding="utf-8")
+            import sys
+            self.command(jid,[sys.executable,str(ROOT/"backend/koto/translate_worker.py"),str(req),str(res)],root/f"{jid}.log")
+            result = json.loads(res.read_text(encoding="utf-8"))
+        else:
+            result = self.worker(jid,project,"translation",{"mode":"alternatives","line":line,**prompt})
+        texts = result.get("alternatives")
+        if not isinstance(texts,list) or not 1<=len(texts)<=5 or any(not isinstance(t,str) or not t.strip() or len(t)>20000 for t in texts):
+            raise ValueError("Translation model returned invalid alternatives")
+        suggestions=[{"text":t.strip(),"estimated_seconds":estimate_seconds(t,project["settings"].get("estimated_speech_wpm",150))} for t in dict.fromkeys(texts)]
+        key=adaptation_signature(line)
+        def merge(p):
+            current=next((l for l in p["dialogue"] if l["id"]==line["id"]),None)
+            if current and adaptation_signature(current)==key:
+                current["alternatives"]={"signature":key,"basis":{k:line.get(k) for k in ("source","subtitle","translation","start","end")},"suggestions":suggestions}
+            return p
+        self.commit(jid,project["id"],merge)
+        return {"line_id":line["id"],"suggestions":len(suggestions)}
+
     def synthesize(self, jid, project, options):
         selected = options.get("line_ids")
         candidates = [l for l in project["dialogue"] if l.get("translation","").strip() and (not selected or l["id"] in selected)]
@@ -346,7 +446,8 @@ class Jobs:
             if voice.get("adapter"):
                 config["models"]["synthesis"]["id"] = voice["adapter"]
             config["models"]["synthesis"]["settings"].update(voice.get("settings",{}))
-            request = {"text":line["translation"], "reference":str(self.store.asset(project["id"],speaker["reference"])) if speaker.get("reference") else None}
+            reference = self.source_reference(jid, project, speaker)["asset"] if speaker.get("use_source_reference") else speaker.get("reference")
+            request = {"text":line["translation"], "reference":str(self.store.asset(project["id"],reference)) if reference else None}
             result = self.worker(jid,config,"synthesis",request,i/len(lines),1/len(lines))
             conversion = None if voice.get("conversion_disabled") else voice.get("conversion") or project["models"].get("voice_conversion")
             if conversion:
@@ -359,10 +460,12 @@ class Jobs:
             target = line["end"]-line["start"]
             factor = raw_duration/target
             fits = 0.8 <= factor <= 1.25
-            filters = atempo_factor(factor) if project["settings"].get("fit_duration") and fits else "anull"
+            filters = "anull"  # Keep the original take; monitor/export apply reversible speed settings.
             self.ffmpeg(jid,root,"-i",generated_path,"-af",filters,"-ar","48000","-ac","2",normalized)
             audio = {"asset":normalized.name,"duration":probe(normalized)["duration"],"signature":signature(project,line),"kind":"generated","model":config["models"]["synthesis"],"conversion":conversion,"raw_duration":raw_duration}
-            warning = "Timing needs review: rewrite or adjust the line before export" if raw_duration > target and not fits else ""
+            rate = playback_rate(project,line,raw_duration)
+            played = raw_duration/rate
+            warning = "Timing needs review: rewrite or adjust the line before export" if played > target+.08 else "Voice take is shorter than its slot. Consider a fuller adaptation or a slower speed." if played < target*.75 else ""
             def merge(p):
                 current = next((l for l in p["dialogue"] if l["id"]==line["id"]),None)
                 if current and signature(p,current)==audio["signature"] and current["start"]==line["start"] and current["end"]==line["end"] and current.get("audio")==line.get("audio"):
@@ -375,16 +478,21 @@ class Jobs:
 
     def export(self, jid, project, options):
         root = self.store.project_dir(project["id"])
-        lines = project["dialogue"]
-        if not lines:
+        all_lines = project["dialogue"]
+        if not all_lines:
             raise ValueError("Add dialogue and replacement audio before rendering")
+        muted = {s["id"] for s in project["speakers"] if s.get("muted", False)}
+        lines = [l for l in all_lines if l["speaker"] not in muted]
         missing = [l for l in lines if not l.get("audio")]
         if missing:
             raise ValueError(f"{len(missing)} dialogue lines have no replacement audio. Generate or import every line before rendering.")
         duration = project["media"]["duration"]
         mode = project["settings"].get("background_mode","separated")
         bed = project["assets"].get("background") if mode == "separated" else project["assets"].get("original_audio") if mode == "original" else None
-        if mode == "separated" and not bed:
+        bed_muted = project["settings"].get("background_muted", False) if mode == "separated" else project["settings"].get("original_muted", False)
+        if bed_muted:
+            bed = None
+        if mode == "separated" and not bed and not bed_muted:
             raise ValueError("Separate audio first, or choose Silence / Original mix in Export settings")
         self.progress(jid,0.05,"Preparing synchronized dialogue clips")
         clips = []
@@ -395,12 +503,11 @@ class Jobs:
                 raise ValueError("A voice take is out of date. Regenerate the changed line.")
             target = line["end"]-line["start"]
             actual = probe(self.store.asset(project["id"],audio["asset"]))["duration"]
-            factor = actual/target
-            fit = project["settings"].get("fit_duration",True)
-            if actual > target+0.08 and not (fit and factor <= 1.25):
+            rate = playback_rate(project,line,actual)
+            if actual/rate > target+0.08:
                 raise ValueError(f"Line {i+1} exceeds its slot. Edit wording or extend its timing; export will not cut off dialogue.")
             normalized = root / f"{jid[:8]}_mixclip_{i}.wav"
-            filters = atempo_factor(factor) if fit and 0.8<=factor<=1.25 else "anull"
+            filters = atempo_factor(rate) if abs(rate-1)>.001 else "anull"
             self.ffmpeg(jid,root,"-i",self.store.asset(project["id"],audio["asset"]),"-af",filters,"-ar","48000","-ac","2",normalized)
             clips.append((line,normalized))
         self.progress(jid,0.25,"Mixing English dialogue and background")
@@ -451,17 +558,35 @@ class Jobs:
                 finally:
                     floats.release()
         accumulator.unlink(missing_ok=True)
-        self.progress(jid,0.7,"Muxing original video with English audio")
+        visible = project["settings"].get("video_visible", True)
+        subtitles_visible = project["settings"].get("subtitles_visible", True)
+        self.progress(jid,0.7,"Muxing video with English audio" if visible else "Rendering black video with English audio")
         subtitle = root / f"{jid[:8]}_english.srt"
-        write_srt(lines,subtitle)
+        write_srt(all_lines,subtitle)
         container = project["settings"].get("output","mkv")
         target = root / f"{jid[:8]}_english.{container}"
         source = self.store.asset(project["id"],project["media"]["asset"])
         video_index = project["settings"]["video_stream"]
-        args = ["-i",source,"-i",mix_path,"-i",subtitle]
-        if video_index is not None:
+        if visible:
+            args = ["-i",source]
+        else:
+            stream = next((s for s in project["media"]["streams"] if s["type"]=="video" and (video_index is None or s["index"]==video_index)), {})
+            width, height = int(stream.get("width") or 1280), int(stream.get("height") or 720)
+            width, height = width + width % 2, height + height % 2
+            numerator, denominator = (stream.get("fps") or "24/1").split("/")
+            fps = float(numerator)/float(denominator) if float(denominator) else 24
+            fps = fps if 0 < fps <= 240 else 24
+            args = ["-f","lavfi","-i",f"color=c=black:s={width}x{height}:r={fps}"]
+        args += ["-i",mix_path,"-i",subtitle]
+        if not visible:
+            args += ["-map","0:v:0"]
+        elif video_index is not None:
             args += ["-map",f"0:{video_index}"]
-        args += ["-map","1:a:0","-map","2:s:0","-c:v","copy" if container=="mkv" else "libx264","-c:a","aac","-b:a","256k","-c:s","srt" if container=="mkv" else "mov_text","-metadata:s:a:0","language=eng","-metadata:s:s:0","language=eng","-t",str(duration)]
+        args += ["-map","1:a:0","-c:v","copy" if container=="mkv" and visible else "libx264","-c:a","aac","-b:a","256k","-metadata:s:a:0","language=eng","-t",str(duration)]
+        if subtitles_visible:
+            args += ["-map","2:s:0","-c:s","srt" if container=="mkv" else "mov_text","-metadata:s:s:0","language=eng"]
+        if not visible:
+            args += ["-pix_fmt","yuv420p"]
         if container=="mp4":
             args += ["-preset","medium","-crf","18","-movflags","+faststart"]
         self.ffmpeg(jid,root,*args,target)

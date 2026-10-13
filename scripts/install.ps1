@@ -119,10 +119,11 @@ function Install-StudioWorker([string]$Worker) {
         "whisper" { $Packages = @("faster-whisper>=1.1,<2", "ctranslate2>=4.6,<5") }
         "audio" { $Packages = @("demucs>=4,<5", "pyannote.audio>=3.3,<4", "-c", (Join-Path $PSScriptRoot "torch-constraints.txt")) }
         "piper" { $Packages = @("piper-tts>=1.3,<2") }
-        "xtts" { $Packages = @("coqui-tts>=0.27,<1", "soundfile", "-c", (Join-Path $PSScriptRoot "torch-constraints.txt")) }
+        "xtts" { $Packages = @("coqui-tts>=0.27,<0.28", "soundfile", "-c", (Join-Path $PSScriptRoot "torch-constraints.txt")) }
     }
     Invoke-Checked $UvExe (@("--no-config", "pip", "install", "--python", $WorkerPython) + $Packages)
     if ($Worker -in @("audio", "xtts", "whisper")) { Invoke-Checked $WorkerPython @((Join-Path $PSScriptRoot "check_gpu.py")) }
+    if ($Worker -eq "xtts") { Invoke-Checked $WorkerPython @((Join-Path $PSScriptRoot "xtts_setup.py")) }
     if ($Worker -eq "piper") {
         $VoiceDir = Join-Path $RuntimeDir "models\piper"
         New-Item -ItemType Directory -Force -Path $VoiceDir | Out-Null

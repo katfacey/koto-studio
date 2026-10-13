@@ -6,8 +6,7 @@ model environments, and optional local translation runtime inside the app folder
 
 **[Download the complete ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)**
 
-[Windows bootstrap, real Piper speech, and editor resizing verified](https://github.com/katfacey/koto-studio/actions/runs/38390591579)
-with only Windows System32 on PATH.
+[Windows validation runs](https://github.com/katfacey/koto-studio/actions) check bootstrap, real speech workers, HTTP/media output and Chromium editor controls with only Windows System32 on PATH.
 
 ## Standalone installation
 
@@ -19,7 +18,7 @@ with only Windows System32 on PATH.
 3. Double-click **Start.cmd**. Start also bootstraps the core if it is missing.
 4. Use **Install-Models.cmd** to select optional voice/audio workers. For local
    translation, use **Install-Translation.cmd** or the translation choice in
-   that menu. Restart KOTO after adding optional runtimes.
+   that menu. Use **Install-Piper.cmd** to install or repair default voices; use **Install-Reference-Voices.cmd** for original speaker voice matching with XTTS. Restart KOTO after adding optional runtimes.
 5. For automatic speaker diarization, use **Install-Diarization.cmd** as described
    below. Installing the audio worker package alone does not download gated weights.
 
@@ -32,7 +31,7 @@ This is **self-contained after setup**, rather than an offline archive containin
 all binaries and every model. The release ZIP includes source and built UI;
 installation downloads the runtime files into the app directory. Basic voices
 and freely downloadable weights can be installed/downloaded there. Gated models
-and optional reference-voice checkpoints still need local provisioning.
+require your Hugging Face account. Install-Reference-Voices.cmd downloads official XTTS checkpoints into the app folder.
 
 The browser editor opens at `http://127.0.0.1:8765`. Keep the standalone terminal
 open; Ctrl+C stops the server and its owned translation process. This is a
@@ -51,6 +50,7 @@ To edit and run the source on your PC, see [LOCAL-WORKSPACE.md](LOCAL-WORKSPACE.
 | `.workers/<worker>/` | Isolated AI environments and CUDA runtime libraries |
 | `runtime/models/pyannote/` | Downloaded segmentation/embedding checkpoints and local pipeline YAML |
 | `runtime/cache/` | Python package, Hugging Face, and Torch caches |
+| `runtime/models/xtts/` | Official XTTS reference-voice checkpoints |
 | `runtime/models/piper/` | Downloaded English voice and matching config |
 | `runtime/ollama/` | Optional portable Ollama runtime |
 | `runtime/models/ollama/` | Local translation weights |
@@ -68,6 +68,53 @@ Installers preserve project data. When migrating an older version, system-Python
 virtual environments are recreated against the private Python. After moving the
 installed folder, rerun Install.cmd and the optional profiles you use to repair
 virtual-environment paths; installed environments are not assumed relocatable.
+
+## Timeline editing and voice timing
+
+Drag a dialogue clip into another speaker lane to correct attribution. Hold Shift
+to keep its time fixed, or drop on a lane header. Horizontal dragging snaps to the
+source frame rate. Drag a speaker's grip to reorder lanes; focused grips also
+support Arrow Up/Down. Imported takes remain attached; changing an actor clears a
+generated take so it can be regenerated with the correct voice. Undo/redo and Save
+include these edits.
+
+Volume buttons mute speaker, original-dialogue and background tracks. Eye buttons
+hide video or subtitles. English mix previews play individual takes and the selected
+background live, so mutes work immediately before export. Render uses the same mute
+and visibility settings; hidden video renders black. In Original monitoring mode,
+speaker mutes gate the raw vocal stem at that actor's original timestamps. Simultaneous
+voices in one raw stem cannot be muted independently; without separation, original
+mix dialogue and background cannot be controlled independently.
+
+Small clip dots and the selected line show estimated or measured timing. Estimates
+use English word count, punctuation and the adjustable words-per-minute pace; they
+are hints, not predictions from the selected TTS model. Generate measures the actual
+take. Automatic fit can adjust speed within 0.80–1.25×. Manual speech speed overrides
+auto-fit for that clip; preview and export apply it without overwriting the take.
+Export rejects speech that still exceeds its slot instead of cutting it off.
+
+**Suggest alternatives** runs the selected local translation model for one clip.
+It proposes concise, near-target and fuller phrasings; it leaves your adaptation
+unchanged until you click **Use this**. Review meaning and synthesize the chosen
+wording to measure its actual duration. No alternatives are generated for the entire
+project automatically. Local Ollama supports this directly; custom adapters can
+opt in to the alternatives protocol.
+
+In a speaker's **Voices** inspector, check **Use this speaker's original dialogue
+as voice reference**. KOTO selects XTTS if the current synthesis adapter cannot use
+references. Generate builds and caches up to 12 seconds from non-overlapping source
+lines, using separated vocals when available. At least 3 seconds is required.
+Correct assignments first. Retiming English clips preserves the original reference
+timestamps. Uncheck it to use an uploaded sample; the uploaded file is retained.
+XTTS voice similarity is approximate. Piper uses fixed voices and cannot clone.
+Official [XTTS-v2 weights](https://huggingface.co/coqui/XTTS-v2) use the Coqui Public
+Model License; consult the model page for permitted uses.
+
+If Generate reports a moved or external worker environment, close KOTO and rerun
+Install-Piper.cmd (default Piper) or Install-Reference-Voices.cmd (XTTS) in the current
+folder. This rebuilds the affected environment against app-owned Python and preserves
+project data. **Use project default** inherits Model manager → Synthesis; new projects
+default to Piper.
 
 ## Complete a project
 
@@ -122,7 +169,7 @@ workers by importing subtitles and replacement takes.
 | Choice | Installs | Additional setup |
 | --- | --- | --- |
 | Default dubbing workers | Demucs, Pyannote package, Faster Whisper, Piper + English voice | Gated diarization pipeline still needs provisioning; recognition/separation weights download on first use. |
-| XTTS | Reference-conditioned voice worker | Supply a local XTTS v2 model directory and a speaker reference. |
+| XTTS | Reference-conditioned voice worker | Run Install-Reference-Voices.cmd; use original dialogue references or upload a clean sample. |
 | Local translation | Private Ollama + Qwen3 14B | No system Ollama service needed. |
 | All | All workers and local translation | Still provision gated/XTTS checkpoint files as needed. |
 | Speaker diarization weights | Audio worker plus local pyannote pipeline/weights | Accept Hugging Face access agreements and enter a read token locally. |

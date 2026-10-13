@@ -3,7 +3,7 @@ import torch
 
 print("PyTorch:", torch.__version__, "CUDA runtime:", torch.version.cuda)
 if not torch.cuda.is_available():
-    raise SystemExit("CUDA is unavailable. Check the NVIDIA driver, or choose CPU mode.")
+    print("CUDA is unavailable on this machine. Workers can use CPU mode; check the NVIDIA driver before choosing CUDA.")
 for i in range(torch.cuda.device_count()):
     name = torch.cuda.get_device_name(i)
     capability = torch.cuda.get_device_capability(i)
