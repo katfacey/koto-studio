@@ -64,17 +64,18 @@ class RuntimeIsolationTests(unittest.TestCase):
         for value in ("https://example.com","http://example.com","http://user:secret@localhost:11435","http://localhost:11435/proxy"):
             with self.assertRaises(ValueError):ollama_url({"KOTO_OLLAMA_URL":value})
 
-    def test_pinokio_source_manifest_excludes_installed_tools_and_project_data(self):
+    def test_standalone_source_manifest_excludes_installed_tools_and_project_data(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp).resolve()
             (root/"scripts").mkdir()
-            for name in ("Install-Pinokio.cmd","pinokio.js","runtime/uv/uv.exe","data/projects/private/video.mkv",".venv/Scripts/python.exe",".workers/audio/model.pth"):
+            for name in ("Install.cmd","Start.cmd","runtime/uv/uv.exe","data/projects/private/video.mkv",".venv/Scripts/python.exe",".workers/audio/model.pth"):
                 path=root/name
                 path.parent.mkdir(parents=True,exist_ok=True)
                 path.write_bytes(b"fixture")
             refresh_source_manifest(root)
             files=json.loads((root/"scripts"/"source-files.json").read_text())
-            self.assertIn("Install-Pinokio.cmd",files)
+            self.assertIn("Install.cmd",files)
+            self.assertIn("Start.cmd",files)
             self.assertIn("scripts/source-files.json",files)
             self.assertNotIn("runtime/uv/uv.exe",files)
             self.assertNotIn("data/projects/private/video.mkv",files)

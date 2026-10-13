@@ -4,10 +4,9 @@ A local Japanese-to-English dubbing editor for **Windows x64 + NVIDIA**, designe
 around an RTX 5090 with 32 GB VRAM. KOTO installs and runs its own Python, FFmpeg,
 model environments, and optional local translation runtime inside the app folder.
 
-**[Pinokio installation guide](PINOKIO.md)** ·
 **[Download the complete ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)**
 
-[Windows bootstrap and Pinokio folder installer verified](https://github.com/katfacey/koto-studio/actions/runs/38351990802)
+[Windows standalone bootstrap verified](https://github.com/katfacey/koto-studio/actions/runs/38351990802)
 with only Windows System32 on PATH.
 
 ## Standalone installation
@@ -34,20 +33,8 @@ and freely downloadable weights can be installed/downloaded there. Gated models
 and optional reference-voice checkpoints still need local provisioning.
 
 The browser editor opens at `http://127.0.0.1:8765`. Keep the standalone terminal
-open; Ctrl+C stops the server and its owned translation process. Pinokio manages
-that server from its own Start entry. This is not a signed standalone EXE.
-
-## Pinokio installer
-
-Double-click **[Install-Pinokio.cmd](Install-Pinokio.cmd)** from the extracted ZIP
-and select your **Pinokio Home** folder (the folder containing `api`). It copies
-KOTO into `api\koto-studio` and bootstraps Python/FFmpeg there. Then open Pinokio
-**Downloaded → KOTO Studio → Start**.
-
-The full walkthrough is in **[PINOKIO.md](PINOKIO.md)**. Pinokio's own installer
-entry is **[install.js](install.js)**, with **[pinokio.js](pinokio.js)** providing
-the menu and **[start.js](start.js)** launching the app. All of them are included.
-They use the same managed bootstrap as the standalone launcher.
+open; Ctrl+C stops the server and its owned translation process. This is a
+standalone Windows environment with a browser editor, not a signed EXE.
 
 ## What stays inside the application folder
 
@@ -127,8 +114,7 @@ workers by importing subtitles and replacement takes.
 | Local translation | Private Ollama + Qwen3 14B | No system Ollama service needed. |
 | All | All workers and local translation | Still provision gated/XTTS checkpoint files as needed. |
 
-The same choices and individual worker installers appear in Pinokio. Torch
-2.7.1/torchaudio 2.7.1 CUDA 12.8 wheels supply GPU libraries. The Whisper worker
+Torch 2.7.1/torchaudio 2.7.1 CUDA 12.8 wheels supply GPU libraries. The Whisper worker
 also gets those local cuBLAS/cuDNN libraries; no separate CUDA toolkit or DLL
 PATH setup is required by the managed installer. GPU compatibility is checked
 with `scripts/check_gpu.py` during installation, but inference still depends on
@@ -200,11 +186,11 @@ python -m unittest discover -s backend/tests -v
 ```
 
 Node is optional for development checks:
-`node frontend/check-ui.mjs` and `node scripts/check-pinokio.mjs`.
+`node frontend/check-ui.mjs`.
 API documentation is at `/docs`. The Windows GitHub Actions workflow exercises
 core installation and the HTTP/media tests with PATH limited to Windows System32.
 See [VALIDATION.md](VALIDATION.md) and the repository's Actions tab for results.
-GPU inference, native-window behavior, and Pinokio-hosted UI still need validation
+GPU inference and native-window behavior still need validation
 on the actual target machine.
 
 Optional native window uses pywebview and Windows WebView2. Install pywebview into

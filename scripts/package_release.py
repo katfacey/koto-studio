@@ -13,7 +13,8 @@ with zipfile.ZipFile(target) as archive:
     assert archive.testzip() is None
     assert "KOTO-Studio/frontend/dist/index.html" in archive.namelist()
     assert "KOTO-Studio/Start.cmd" in archive.namelist()
-    assert "KOTO-Studio/Install-Pinokio.cmd" in archive.namelist()
+    for launcher in ("Install.cmd", "Install-Models.cmd", "Install-Translation.cmd"):
+        assert f"KOTO-Studio/{launcher}" in archive.namelist()
     assert "KOTO-Studio/scripts/source-files.json" in archive.namelist()
     assert not any("/data/" in p or "/.venv/" in p or "/runtime/" in p for p in archive.namelist())
     print(f"Packaged {len(archive.namelist())} files: {target} ({target.stat().st_size:,} bytes)")

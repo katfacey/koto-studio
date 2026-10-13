@@ -158,4 +158,4 @@ switch ($SetupProfile) {
     default { Install-StudioWorker $SetupProfile }
 }
 Write-Host "KOTO $SetupProfile setup complete. Tools and caches are inside $StudioRoot. No system PATH changes were made."
-Write-Host "Restart KOTO after adding optional runtimes. Use Start.cmd or Pinokio's Start menu."
+Write-Host "Restart KOTO after adding optional runtimes. Use Start.cmd."

@@ -1,4 +1,4 @@
-"""Server entry used by both Start.cmd and Pinokio's Start menu."""
+"""Standalone server entry used by Start.cmd."""
 from pathlib import Path
 import os
 import sys
