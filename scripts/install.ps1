@@ -1,6 +1,6 @@
 param(
     [Alias("Profile")]
-    [ValidateSet("core", "whisper", "audio", "piper", "xtts", "translation", "models", "all")]
+    [ValidateSet("core", "whisper", "audio", "piper", "xtts", "translation", "diarization", "models", "all")]
     [string]$SetupProfile = "core",
     [string]$TranslationModel = ""
 )
@@ -157,6 +157,11 @@ switch ($SetupProfile) {
     "models" { foreach ($Worker in @("audio","whisper","piper")) { Install-StudioWorker $Worker } }
     "all" { foreach ($Worker in @("audio","whisper","piper","xtts")) { Install-StudioWorker $Worker }; Install-StudioTranslation }
     "translation" { Install-StudioTranslation }
+    "diarization" {
+        Install-StudioWorker "audio"
+        $AudioPython = Join-Path $StudioRoot ".workers\audio\Scripts\python.exe"
+        Invoke-Checked $AudioPython @((Join-Path $PSScriptRoot "diarization_setup.py"))
+    }
     default { Install-StudioWorker $SetupProfile }
 }
 Write-Host "KOTO $SetupProfile setup complete. Tools and caches are inside $StudioRoot. No system PATH changes were made."

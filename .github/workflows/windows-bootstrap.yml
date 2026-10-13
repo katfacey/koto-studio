@@ -82,3 +82,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & ".\.venv\Scripts\python.exe" scripts\check_piper.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Test real editor panel resizing and the Cancel icon in Chromium
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path (Get-Location).Path 'runtime\cache\playwright'
+          & ".\runtime\uv\uv.exe" --no-config pip install --python ".\.venv\Scripts\python.exe" -r scripts\requirements-ui-checks.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ".\.venv\Scripts\python.exe" -m playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ".\.venv\Scripts\python.exe" scripts\check_editor_browser.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows-editor-screenshot
+          path: KOTO Studio/runtime/validation/koto-editor.png

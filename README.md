@@ -20,6 +20,8 @@ with only Windows System32 on PATH.
 4. Use **Install-Models.cmd** to select optional voice/audio workers. For local
    translation, use **Install-Translation.cmd** or the translation choice in
    that menu. Restart KOTO after adding optional runtimes.
+5. For automatic speaker diarization, use **Install-Diarization.cmd** as described
+   below. Installing the audio worker package alone does not download gated weights.
 
 You do not need to install Python, FFmpeg, Node/npm, Ollama, or a CUDA toolkit
 before running these installers. The host requirements are Windows 10/11 x64,
@@ -47,6 +49,7 @@ To edit and run the source on your PC, see [LOCAL-WORKSPACE.md](LOCAL-WORKSPACE.
 | `runtime/ffmpeg/bin/` | Private FFmpeg, ffprobe, and companion files |
 | `.venv/` | Core backend packages |
 | `.workers/<worker>/` | Isolated AI environments and CUDA runtime libraries |
+| `runtime/models/pyannote/` | Downloaded segmentation/embedding checkpoints and local pipeline YAML |
 | `runtime/cache/` | Python package, Hugging Face, and Torch caches |
 | `runtime/models/piper/` | Downloaded English voice and matching config |
 | `runtime/ollama/` | Optional portable Ollama runtime |
@@ -87,6 +90,8 @@ virtual-environment paths; installed environments are not assumed relocatable.
    Subtitle references match by temporal overlap. Pyannote assigns the most
    overlapping speaker and flags possible overlaps; it does not isolate
    simultaneously speaking voices. You can assign speakers manually.
+   Missing diarization weights are reported before the job starts, with instructions
+   to run the local setup launcher in the error message.
 5. **Translate.** Local Ollama receives the line, nearby dialogue, subtitle
    reference, and target duration. English remains editable. Review meaning,
    pronouns, terminology, and timing; there is no guarantee that an LLM's line
@@ -120,6 +125,31 @@ workers by importing subtitles and replacement takes.
 | XTTS | Reference-conditioned voice worker | Supply a local XTTS v2 model directory and a speaker reference. |
 | Local translation | Private Ollama + Qwen3 14B | No system Ollama service needed. |
 | All | All workers and local translation | Still provision gated/XTTS checkpoint files as needed. |
+| Speaker diarization weights | Audio worker plus local pyannote pipeline/weights | Accept Hugging Face access agreements and enter a read token locally. |
+
+### Set up speaker diarization
+
+1. Sign in and accept access agreements for
+   [speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
+   and [segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0).
+2. Create a [Hugging Face read token](https://huggingface.co/settings/tokens).
+3. Double-click **Install-Diarization.cmd** and paste the token into its hidden
+   local prompt. KOTO uses it for model downloads and does not save it.
+4. Restart KOTO and retry **Speakers**. Existing projects with an empty model
+   path automatically use `runtime/models/pyannote/pipeline.yaml`. For an explicit
+   custom path, change it in Model manager → Speaker diarization.
+
+The installer pins each download to its resolved revision and writes a pipeline
+with absolute local checkpoint paths. The diarization worker uses offline Hugging
+Face mode during inference. Model access and GPU inference must be checked on your
+PC; the automated provisioning checks use fixtures and do not approve access agreements.
+
+### Resize the editor
+
+Drag the dividers beside the media panel and inspector, above the timeline, or
+above the dialogue editor. Sizes persist in the browser. Double-click a divider
+to reset it; focused dividers also support arrow keys (Shift for larger steps)
+and Home to reset. Dialogue text areas can be resized vertically as well.
 
 Torch 2.7.1/torchaudio 2.7.1 CUDA 12.8 wheels supply GPU libraries. The Whisper worker
 also gets those local cuBLAS/cuDNN libraries; no separate CUDA toolkit or DLL
@@ -193,7 +223,7 @@ python -m unittest discover -s backend/tests -v
 ```
 
 Node is optional for development checks:
-`node frontend/check-ui.mjs`.
+`node frontend/check-ui.mjs` and `node frontend/check-layout.mjs`.
 API documentation is at `/docs`. The Windows GitHub Actions workflow exercises
 core installation and the HTTP/media tests with PATH limited to Windows System32.
 See [VALIDATION.md](VALIDATION.md) and the repository's Actions tab for results.

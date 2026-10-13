@@ -48,15 +48,25 @@ def run(request):
             progress(min(0.95, s.end/max(info.duration, 1)), f"Recognized {s.end:.1f}s")
         return {"lines": lines, "language": info.language}
     if adapter == "pyannote":
+        from diarization import require_pipeline
+        model_path = require_pipeline(settings)
+        # Pyannote 3.x uses Lightning checkpoints with model/task metadata.
+        os.environ.setdefault("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "1")
+        os.environ["HF_HUB_OFFLINE"] = "1"
+        os.environ["HF_DATASETS_OFFLINE"] = "1"
         import torch
         from pyannote.audio import Pipeline
-        model_path = Path(settings.get("model", ""))
-        if not model_path.is_file():
-            raise ValueError("Configure a local pyannote pipeline YAML and local weights first")
         progress(0.1, "Loading local speaker pipeline")
         pipeline = Pipeline.from_pretrained(str(model_path))
+        if pipeline is None:
+            raise ValueError("Could not load the local pipeline. Rerun Install-Diarization.cmd or select a valid local pipeline in Model manager.")
         pipeline.to(torch.device(device))
-        result = pipeline(request["audio"])
+        def report(step, artifact, **state):
+            total = state.get("total") or 1
+            fraction = min(1, state["completed"] / total) if state.get("completed") is not None else 1
+            base, span = {"segmentation": (.15, .35), "embeddings": (.5, .35)}.get(step, (.85, .1))
+            progress(base + fraction * span, f"Speaker diarization: {step}")
+        result = pipeline(request["audio"], hook=report)
         annotation = getattr(result, "speaker_diarization", result)
         turns = [{"start": turn.start, "end": turn.end, "speaker": speaker} for turn, _, speaker in annotation.itertracks(yield_label=True)]
         return {"turns": turns}

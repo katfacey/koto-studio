@@ -115,6 +115,16 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("source_subtitles", self.p["assets"])
         self.assertTrue(any("preview ·" in call.args[2] and call.args[1] > .35 for call in progress.call_args_list))
 
+    async def test_missing_diarization_weights_are_reported_before_queuing(self):
+        await self.upload("media", self.video)
+        models = dict(self.p["models"])
+        models["diarization"] = {"id": "pyannote", "settings": {"model": str(Path(self.temp.name)/"missing.yaml"), "device": "cpu"}}
+        await self.patch(models=models)
+        response = await self.client.post(f"/api/projects/{self.pid}/jobs", json={"kind": "diarize"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Install-Diarization.cmd", response.json()["detail"])
+        self.assertEqual(self.app.state.store.jobs(self.pid), [])
+
     async def test_import_prepare_manual_dub_export_and_reopen(self):
         await self.upload("media",self.video)
         self.assertEqual([s["type"] for s in self.p["media"]["streams"]],["video","audio","subtitle"])

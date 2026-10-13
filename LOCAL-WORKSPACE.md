@@ -3,7 +3,7 @@
 Your existing installation is already an editable source workspace:
 
 ```text
-F:\ai\AI Vibe Code Projects and Output\Programs\koto-studio-main
+F:\ai\AI Vibe Code Projects and Output\Programs\koto-studio\KOTO-Studio-v0.2.0
 ```
 
 Open that folder in the local Codex application or your code editor. Start a
@@ -20,7 +20,7 @@ For the Piper JSON fix, replace your existing `scripts\install.ps1` with the
 updated file. In PowerShell, run only the Piper profile:
 
 ```powershell
-Set-Location -LiteralPath 'F:\ai\AI Vibe Code Projects and Output\Programs\koto-studio-main'
+Set-Location -LiteralPath 'F:\ai\AI Vibe Code Projects and Output\Programs\koto-studio\KOTO-Studio-v0.2.0'
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile piper
 ```
 
@@ -34,5 +34,5 @@ using the app-owned Python, then refresh the browser:
 ```
 
 Edit `backend\koto` for the API, queue, media processing, and model adapters.
-Restart Start.cmd after backend changes. No Node/npm or system Python is needed
+Stop the running KOTO terminal with Ctrl+C, then run Start.cmd after backend changes. No Node/npm or system Python is needed
 to build or run the app. Tests and runtime details are in README.md and VALIDATION.md.

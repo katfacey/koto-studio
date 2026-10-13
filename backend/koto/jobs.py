@@ -15,6 +15,7 @@ from .media import IMAGE_SUBTITLE_CODECS, atempo_factor, binary, parse_subtitles
 from .registry import interpreter, local_json
 from .store import ROOT
 from .runtime import executable, runtime_environment
+from .diarization import require_pipeline
 
 CAPABILITIES = {"separate":"separation", "transcribe":"transcription", "diarize":"diarization", "translate":"translation", "synthesize":"synthesis"}
 
@@ -58,6 +59,8 @@ class Jobs:
         if kind in CAPABILITIES:
             cap = CAPABILITIES[kind]
             self.registry.get(project["models"][cap]["id"], cap)
+            if kind == "diarize" and project["models"][cap]["id"] == "pyannote":
+                require_pipeline(project["models"][cap].get("settings"))
         spec = {"project": project, "options": options or {}}
         jid = self.store.job_create(pid, kind, spec)
         self.queue.put((jid, pid, kind, spec))

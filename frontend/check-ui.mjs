@@ -47,6 +47,10 @@ await import('./src/app.js');
 for(let i=0;i<15;i++)await Promise.resolve();
 assert.ok(root.innerHTML.includes('DUBBING PIPELINE'));
 assert.ok(root.innerHTML.includes('PROGRAM MONITOR'));
+assert.ok(root.innerHTML.includes('data-panel-resize="left"'));
+assert.ok(root.innerHTML.includes('data-panel-resize="right"'));
+assert.ok(root.innerHTML.includes('data-panel-resize="timeline"'));
+assert.ok(root.innerHTML.includes('data-panel-resize="dialogue"'));
 assert.ok(root.innerHTML.includes('Sample &lt;img'));
 assert.ok(!root.innerHTML.includes('<img src=x onerror='));
 assert.ok(nodes.get('.timeline-content').innerHTML.includes('Hello there.'));
@@ -84,6 +88,7 @@ jobs[0]={...jobs[0],status:'running',progress:.51,message:'Creating browser-comp
 await timers[1]();
 assert.ok(root.innerHTML.includes('Preparing media · 51%'));
 assert.ok(root.innerHTML.includes('32% processed'));
+assert.ok(root.innerHTML.includes('m6 6 12 12M6 18 18 6'));
 jobs[0]={...jobs[0],status:'failed',message:'Selected subtitle track contains images. <img src=x>'};
 await timers[1]();
 assert.ok(root.innerHTML.includes('Prepare failed'));

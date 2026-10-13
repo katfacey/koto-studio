@@ -7,7 +7,7 @@ Windows checks: GitHub-hosted Windows, managed Python 3.11, bundled FFmpeg 9.0.2
 
 The following checks passed:
 
-- Eighteen backend/runtime tests, including HTTP requests through the real ASGI application and
+- Twenty-two backend/runtime tests, including HTTP requests through the real ASGI application and
   real FFmpeg media operations. They cover MKV import and track inspection,
   audio extraction, preview encoding, subtitles, imported voice takes, MKV and
   MP4 output, output duration, sample-level placement of voice clips, silent
@@ -31,6 +31,12 @@ The following checks passed:
   immediate validation errors. The HTTP fixtures in this harness are test data.
 - Python compilation.
 - Dependency-free frontend build.
+- Diarization provisioning fixtures verify revision-pinned downloads, absolute local
+  checkpoint paths, ASCII YAML for Windows compatibility, removal of auth fields,
+  managed pipeline fallback, and early missing-weights errors. These checks do not
+  download gated weights or perform diarization inference.
+- Panel geometry and interaction checks cover width/height bounds, pointer resizing,
+  saved sizes, keyboard access, reset, and malformed saved preferences.
 - Windows PowerShell 5.1 installation of Piper with the real downloaded Lessac
   voice and UTF-8, case-sensitive phoneme config validation through private Python.
   The actual isolated Piper worker generated 2.68 seconds of non-silent English
@@ -43,7 +49,7 @@ configured weights, and a compatible host. They were not installed/executed here
 
 The passing Windows GitHub Actions workflow parses PowerShell installers, installs
 the core with PATH restricted to Windows System32, asserts that Python/FFmpeg are
-app-owned, runs the 18 tests, and starts the actual server/editor. The standalone
+app-owned, runs the 22 tests, and starts the actual server/editor. The standalone
 workflow installs into a path with spaces and reinstalls the core while checking
 that a project-data fixture survives. It also installs and exercises the real
 Piper worker, separately from deterministic protocol fixtures.
