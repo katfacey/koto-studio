@@ -17,7 +17,7 @@ from .store import ROOT
 from .runtime import executable, runtime_environment
 from .diarization import require_pipeline
 from .timing import estimate_seconds, playback_rate, adaptation_signature
-from .references import reference_segments, reference_signature
+from .references import reference_segments, reference_signature, source_bounds
 
 CAPABILITIES = {"separate":"separation", "transcribe":"transcription", "diarize":"diarization", "translate":"translation", "synthesize":"synthesis"}
 
@@ -349,7 +349,8 @@ class Jobs:
             if speakers:
                 p["speakers"] = speakers
                 for line in p["dialogue"]:
-                    scored = [(max(0,min(t["end"],line["end"])-max(t["start"],line["start"])),t["speaker"]) for t in turns]
+                    start,end = source_bounds(line)
+                    scored = [(max(0,min(t["end"],end)-max(t["start"],start)),t["speaker"]) for t in turns]
                     best = max(scored,key=lambda t:t[0])
                     line["speaker"] = best[1]
                     line["audio"] = None
@@ -373,8 +374,8 @@ class Jobs:
             for i,line in enumerate(lines):
                 self.progress(jid,i/len(lines),f"Translating line {i+1} of {len(lines)}")
                 index = project["dialogue"].index(line)
-                context = [{"speaker":l["speaker"],"japanese":l.get("source",""),"subtitle":l.get("subtitle","")} for l in project["dialogue"][max(0,index-2):index+3]]
-                prompt = json.dumps({"context":context,"line":{"japanese":line.get("source",""),"subtitle_reference":line.get("subtitle",""),"target_seconds":round(line["end"]-line["start"],2)}},ensure_ascii=False)
+                context = [{"speaker":l["speaker"],"source":l.get("source",""),"subtitle":l.get("subtitle","")} for l in project["dialogue"][max(0,index-2):index+3]]
+                prompt = json.dumps({"context":context,"line":{"source":line.get("source",""),"subtitle_reference":line.get("subtitle",""),"target_seconds":round(line["end"]-line["start"],2)}},ensure_ascii=False)
                 if not line.get("source") and not line.get("subtitle"):
                     continue
                 # Local requests run in a cancellable helper process as LLM responses can be slow.
@@ -458,8 +459,6 @@ class Jobs:
             raw_duration = probe(generated_path)["duration"]
             normalized = root / f"{jid[:8]}_{line['id']}_voice.wav"
             target = line["end"]-line["start"]
-            factor = raw_duration/target
-            fits = 0.8 <= factor <= 1.25
             filters = "anull"  # Keep the original take; monitor/export apply reversible speed settings.
             self.ffmpeg(jid,root,"-i",generated_path,"-af",filters,"-ar","48000","-ac","2",normalized)
             audio = {"asset":normalized.name,"duration":probe(normalized)["duration"],"signature":signature(project,line),"kind":"generated","model":config["models"]["synthesis"],"conversion":conversion,"raw_duration":raw_duration}

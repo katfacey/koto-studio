@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 Write-Host "KOTO optional model setup (all files remain inside the application folder)"
 Write-Host "1. Audio separation + Japanese recognition + English Piper voice (several GB)"
-Write-Host "2. XTTS reference-voice worker (local model weights must be provided)"
+Write-Host "2. XTTS reference voices + official local model weights (several GB)"
 Write-Host "3. Local Ollama + Qwen3 14B translation model (roughly 12 GB)"
 Write-Host "4. All workers + local translation (roughly 20+ GB; gated/model files may still need provisioning)"
 Write-Host "5. Speaker diarization weights (Hugging Face access agreements + read token)"

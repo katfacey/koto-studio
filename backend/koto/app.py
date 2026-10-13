@@ -301,8 +301,8 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
     @app.post("/api/projects/{pid}/subtitles")
     async def import_subtitles(pid:str,file:UploadFile=File(...),language:str=Form("en")):
         project(pid)
-        if language not in ("en","ja"):
-            raise ValueError("Subtitle language must be en or ja")
+        if language not in ("en","ja","zh"):
+            raise ValueError("Subtitle language must be en, ja or zh")
         path = await upload(pid,file,{".srt",".vtt",".ass",".ssa"})
         if path.suffix in (".ass",".ssa"):
             converted = path.with_suffix(".srt")
@@ -318,7 +318,7 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
         if not lines:
             raise ValueError("No readable subtitle lines found")
         for line in lines:
-            line["source" if language=="ja" else "translation"] = line["subtitle"]
+            line["source" if language!="en" else "translation"] = line["subtitle"]
         def merge(p):
             if not p["dialogue"]:
                 p["dialogue"] = lines
@@ -330,7 +330,7 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
                         line["subtitle"] = best["subtitle"]
                         if language=="en" and not line.get("translation"):
                             line["translation"] = best["translation"]
-                        if language=="ja" and not line.get("source"):
+                        if language!="en" and not line.get("source"):
                             line["source"] = best["source"]
             p["assets"]["source_subtitles"] = path.name
             for key in ("export","dub_audio","english_subtitles"):

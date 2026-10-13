@@ -133,7 +133,7 @@ default to Piper.
    Separation quality varies; review effects, breaths, and residual original
    dialogue. Demucs is a baseline, not a promise of clean dialogue isolation.
    Alternative separators can be added through the adapter protocol.
-4. **Transcribe / diarize.** Whisper recognizes Japanese with timestamps.
+4. **Transcribe / diarize.** Whisper recognizes Japanese or Chinese with timestamps; choose ja, zh or auto in Model manager → Transcription.
    Subtitle references match by temporal overlap. Pyannote assigns the most
    overlapping speaker and flags possible overlaps; it does not isolate
    simultaneously speaking voices. You can assign speakers manually.
@@ -152,9 +152,9 @@ default to Piper.
    Changing English text or voice configuration invalidates generated takes.
 8. **Export.** Choose separated background, original audio (which retains
    original dialogue), or silence. Export requires a replacement take for every
-   dialogue line. Modest time stretching is supported; overlong speech fails
+   unmuted dialogue line. Modest time stretching is supported; overlong speech fails
    validation rather than being cut off. MKV copies source video; MP4 encodes
-   H.264. Both include English AAC and an English subtitle track. Download the
+   H.264. Both include English AAC and an optional English subtitle track. Download the
    video, mixed WAV, and SRT from Export or completed Jobs.
 
 The sample project is illustrative: it contains editable example dialogue and

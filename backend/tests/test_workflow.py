@@ -233,6 +233,16 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(req["reference"]==uploaded for req in requests))
         self.assertEqual(self.p["speakers"][0]["source_reference"]["asset"],ref["asset"])
 
+    async def test_chinese_source_subtitles_preserve_english_adaptation(self):
+        await self.upload('media',self.video)
+        await self.upload('subtitles',self.sub,{'language':'en'})
+        original=[l['translation'] for l in self.p['dialogue']]
+        source=Path(self.temp.name)/'chinese.srt'
+        source.write_text('1\n00:00:00,500 --> 00:00:01,500\n在这里等候。\n\n2\n00:00:02,000 --> 00:00:03,500\n我们一起回家。\n',encoding='utf-8')
+        await self.upload('subtitles',source,{'language':'zh'})
+        self.assertEqual([l['translation'] for l in self.p['dialogue']],original)
+        self.assertEqual(self.p['dialogue'][0]['source'],'在这里等候。')
+
     async def test_alternative_adaptations_run_only_for_requested_clip_and_do_not_replace_text(self):
         await self.upload("media",self.video)
         await self.upload("subtitles",self.sub,{"language":"en"})

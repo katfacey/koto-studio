@@ -82,7 +82,7 @@ def main():
                         return page.request.get(f'{url}/api/projects/{pid}').json()
                     def save():
                         page.keyboard.press('Control+s')
-                        page.get_by_text('Project saved locally', exact=True).wait_for()
+                        page.wait_for_function("document.querySelector('#save-status')?.textContent === 'Project saved locally'")
                     initial = project()
                     clip_id = initial['dialogue'][0]['id']
                     first, second = [s['id'] for s in initial['speakers']]

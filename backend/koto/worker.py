@@ -41,7 +41,8 @@ def run(request):
         if device == "cpu" and precision in ("float16", "int8_float16"):
             precision = "int8"
         model = WhisperModel(settings.get("model", "large-v3"), device=device, compute_type=precision)
-        segments, info = model.transcribe(request["audio"], language="ja", vad_filter=True, word_timestamps=True, beam_size=5)
+        language = settings.get("language","ja")
+        segments, info = model.transcribe(request["audio"], language=None if language=="auto" else language, vad_filter=True, word_timestamps=True, beam_size=5)
         lines = []
         for s in segments:
             lines.append({"start": s.start, "end": s.end, "source": s.text.strip(), "words": [{"start": w.start, "end": w.end, "text": w.word, "probability": w.probability} for w in s.words or []], "confidence": 1-s.no_speech_prob})
