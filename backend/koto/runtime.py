@@ -21,6 +21,10 @@ def runtime_environment(root=ROOT, base=None, python=None, windows=None):
     env.update({
         "KOTO_APP_ROOT": str(root),
         "HF_HOME": str(runtime / "cache" / "huggingface"),
+        "HF_HUB_CACHE": str(runtime / "cache" / "huggingface" / "hub"),
+        "HUGGINGFACE_HUB_CACHE": str(runtime / "cache" / "huggingface" / "hub"),
+        "HF_DATASETS_CACHE": str(runtime / "cache" / "huggingface" / "datasets"),
+        "TRANSFORMERS_CACHE": str(runtime / "cache" / "huggingface" / "transformers"),
         "TORCH_HOME": str(runtime / "cache" / "torch"),
         "XDG_CACHE_HOME": str(runtime / "cache"),
         "UV_CACHE_DIR": str(runtime / "cache" / "uv"),

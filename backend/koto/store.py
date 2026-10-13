@@ -8,6 +8,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
+from contextlib import contextmanager
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = Path(os.environ.get("KOTO_DATA_DIR", ROOT / "data")).resolve()
@@ -32,8 +33,16 @@ class Store:
             """)
             db.execute("UPDATE jobs SET status='interrupted', message='Application stopped. Retry to resume from cached assets.' WHERE status IN ('queued','running')")
 
+    @contextmanager
     def connect(self):
-        return sqlite3.connect(self.root / "studio.sqlite", timeout=30)
+        connection = sqlite3.connect(self.root / "studio.sqlite", timeout=30)
+        try:
+            with connection:
+                yield connection
+        finally:
+            # SQLite's own context manager commits/rolls back but does not close.
+            # Explicit closure also releases Windows file locks immediately.
+            connection.close()
 
     def project_dir(self, project_id: str) -> Path:
         # IDs are generated internally; never use user-supplied paths.

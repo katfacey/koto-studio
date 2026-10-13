@@ -16,7 +16,7 @@ import runtime_services
 class RuntimeIsolationTests(unittest.TestCase):
     def test_windows_media_tools_resolve_without_path_and_prefer_managed_files(self):
         with tempfile.TemporaryDirectory(prefix="KOTO with spaces ") as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             bin_dir = root / "runtime" / "ffmpeg" / "bin"
             bin_dir.mkdir(parents=True)
             for name in ("ffmpeg", "ffprobe"):
@@ -35,17 +35,17 @@ class RuntimeIsolationTests(unittest.TestCase):
 
     def test_worker_caches_and_dll_directories_are_owned_by_app(self):
         with tempfile.TemporaryDirectory(prefix="KOTO app ") as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             dlls = root / ".workers" / "whisper" / "Lib" / "site-packages" / "torch" / "lib"
             dlls.mkdir(parents=True)
             (root/"runtime"/"ffmpeg"/"bin").mkdir(parents=True)
-            base={"PATH":"external-system-path","SystemRoot":str(root/"Windows")}
+            base={"PATH":"external-system-path","SystemRoot":str(root/"Windows"),"HF_HUB_CACHE":"external-model-cache"}
             worker=root/".workers"/"whisper"/"Scripts"/"python.exe"
             env=runtime_environment(root=root,base=base,python=worker,windows=True)
             self.assertEqual(base["PATH"],"external-system-path")
             self.assertIn(str(dlls),env["PATH"].split(";"))
             self.assertEqual(env["PATH"].split(";")[0],str(root/"runtime"/"ffmpeg"/"bin"))
-            for name in ("HF_HOME","TORCH_HOME","UV_CACHE_DIR","UV_PYTHON_INSTALL_DIR","OLLAMA_MODELS"):
+            for name in ("HF_HOME","HF_HUB_CACHE","HUGGINGFACE_HUB_CACHE","HF_DATASETS_CACHE","TRANSFORMERS_CACHE","TORCH_HOME","UV_CACHE_DIR","UV_PYTHON_INSTALL_DIR","OLLAMA_MODELS"):
                 self.assertTrue(Path(env[name]).is_relative_to(root/"runtime"))
 
     def test_driver_and_cancellation_binaries_use_windows_system_locations(self):
@@ -66,7 +66,7 @@ class RuntimeIsolationTests(unittest.TestCase):
 
     def test_pinokio_source_manifest_excludes_installed_tools_and_project_data(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp)
+            root=Path(tmp).resolve()
             (root/"scripts").mkdir()
             for name in ("Install-Pinokio.cmd","pinokio.js","runtime/uv/uv.exe","data/projects/private/video.mkv",".venv/Scripts/python.exe",".workers/audio/model.pth"):
                 path=root/name
@@ -85,7 +85,7 @@ class RuntimeIsolationTests(unittest.TestCase):
 class ManagedServiceTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
-        self.root=Path(self.temp.name)
+        self.root=Path(self.temp.name).resolve()
         self.binary=self.root/"runtime"/"ollama"/("ollama.exe" if os.name=="nt" else "ollama")
         self.binary.parent.mkdir(parents=True)
         self.binary.write_bytes(b"fixture")
