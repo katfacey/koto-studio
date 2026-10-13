@@ -6,7 +6,7 @@ model environments, and optional local translation runtime inside the app folder
 
 **[Download the complete ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)**
 
-[Windows standalone bootstrap verified](https://github.com/katfacey/koto-studio/actions/runs/38352693802)
+[Windows standalone bootstrap and real Piper speech verified](https://github.com/katfacey/koto-studio/actions/runs/38384120806)
 with only Windows System32 on PATH.
 
 ## Standalone installation
@@ -37,6 +37,8 @@ open; Ctrl+C stops the server and its owned translation process. This is a
 standalone Windows environment with a browser editor, not a signed EXE.
 
 ## What stays inside the application folder
+
+To edit and run the source on your PC, see [LOCAL-WORKSPACE.md](LOCAL-WORKSPACE.md).
 
 | Location | Contents |
 | --- | --- |
