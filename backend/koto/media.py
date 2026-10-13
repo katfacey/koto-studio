@@ -8,6 +8,8 @@ from pathlib import Path
 
 from .runtime import executable
 
+IMAGE_SUBTITLE_CODECS = {"hdmv_pgs_subtitle", "dvd_subtitle", "dvb_subtitle"}
+
 
 def binary(name):
     return executable(name)

@@ -73,7 +73,12 @@ virtual-environment paths; installed environments are not assumed relocatable.
    Importing another source into an existing media project creates a new project.
 2. **Prepare.** Extract stereo 48 kHz audio and make a browser-compatible H.264
    proxy. The original video stays unchanged. Text subtitle streams become SRT.
-   PGS/DVD image subtitle OCR is not included.
+   Image subtitle tracks (PGS/DVD/DVB) are skipped when selecting default tracks;
+   OCR is not included. If an older project has one selected, choose **None** for
+   Subtitle track in the Clip inspector, or use **Prepare without image subtitles**.
+   Import text subtitles separately, or transcribe the extracted Japanese audio.
+   Prepare opens Jobs and shows live encoding progress; failures also appear in
+   the preview and an error alert.
 3. **Separate.** The Demucs adapter creates dialogue and background stems.
    Separation quality varies; review effects, breaths, and residual original
    dialogue. Demucs is a baseline, not a promise of clean dialogue isolation.

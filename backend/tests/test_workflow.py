@@ -9,6 +9,7 @@ import tempfile
 import unittest
 import wave
 from pathlib import Path
+from unittest.mock import patch
 
 import httpx
 
@@ -87,6 +88,32 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         r = await self.client.post(f"/api/projects/{self.pid}/jobs",json={"kind":kind})
         self.assertEqual(r.status_code,200,r.text)
         return await self.wait_job(r.json()["id"])
+
+    async def test_image_subtitles_are_not_auto_selected_and_prepare_errors_are_immediate(self):
+        # Model image-subtitle metadata; media processing itself still uses real FFmpeg.
+        metadata = probe(self.video)
+        subtitle = next(s for s in metadata["streams"] if s["type"] == "subtitle")
+        subtitle["codec"] = "hdmv_pgs_subtitle"
+        with patch("koto.app.probe", return_value=metadata):
+            await self.upload("media", self.video)
+        self.assertIsNone(self.p["settings"]["subtitle_stream"])
+        await self.patch(settings={**self.p["settings"], "subtitle_stream": subtitle["index"]})
+        response = await self.client.post(f"/api/projects/{self.pid}/jobs", json={"kind": "prepare"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Set Subtitle track to None", response.json()["detail"])
+        self.assertEqual(self.app.state.store.jobs(self.pid), [])
+        await self.patch(settings={**self.p["settings"], "subtitle_stream": None, "audio_stream": None, "video_stream": None})
+        response = await self.client.post(f"/api/projects/{self.pid}/jobs", json={"kind": "prepare"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Select at least one source track", response.json()["detail"])
+        await self.patch(settings={**self.p["settings"], "video_stream": 0, "audio_stream": 1})
+        runner = self.app.state.jobs
+        with patch.object(runner, "progress", wraps=runner.progress) as progress:
+            await self.run_job("prepare")
+        self.assertIn("preview", self.p["assets"])
+        self.assertIn("original_audio", self.p["assets"])
+        self.assertNotIn("source_subtitles", self.p["assets"])
+        self.assertTrue(any("preview ·" in call.args[2] and call.args[1] > .35 for call in progress.call_args_list))
 
     async def test_import_prepare_manual_dub_export_and_reopen(self):
         await self.upload("media",self.video)

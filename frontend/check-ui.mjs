@@ -21,6 +21,9 @@ globalThis.setTimeout=()=>0;globalThis.clearTimeout=()=>{};
 
 const p={id:'test-project',name:'Sample <img src=x onerror=alert(1)>',revision:1,demo:true,media:null,assets:{},speakers:[{id:'s1',name:'Speaker 01',color:'#8b8aff',voice:{},reference:null}],dialogue:[{id:'l1',start:1,end:3,speaker:'s1',source:'こんにちは',translation:'Hello there.',subtitle:'Hello.',audio:null}],models:{synthesis:{id:'piper',settings:{model:'',speaker_id:0}},translation:{id:'ollama',settings:{model:'qwen3:14b'}},separation:{id:'demucs',settings:{model:'htdemucs'}},transcription:{id:'faster-whisper',settings:{model:'large-v3'}},diarization:{id:'pyannote',settings:{model:''}}},settings:{audio_stream:null,video_stream:null,subtitle_stream:null,background_mode:'silence',background_gain:.8,dialogue_gain:1,fit_duration:true,output:'mkv'}};
 let saved;
+let jobs=[];
+let nextJob=0;
+let rejectJob='';
 const models=Object.entries(p.models).map(([capability,s])=>({id:s.id,label:s.id,capability,available:false,description:'Test worker metadata',fields:[]}));
 globalThis.fetch=async(path,init={})=>{
   let value;
@@ -28,7 +31,14 @@ globalThis.fetch=async(path,init={})=>{
   else if(path==='/api/models')value=models;
   else if(path==='/api/projects'&&init.method==='POST')value=p;
   else if(path==='/api/projects')value=[];
-  else if(path==='/api/projects/test-project'&&init.method==='PATCH'){saved=JSON.parse(init.body);value={...p,...saved,revision:saved.revision+1};}
+  else if(path==='/api/projects/test-project'&&init.method==='PATCH'){saved=JSON.parse(init.body);Object.assign(p,saved,{revision:saved.revision+1});value=p;}
+  else if(path==='/api/projects/test-project')value=p;
+  else if(path==='/api/projects/test-project/jobs'&&init.method==='POST'){
+    if(rejectJob)return {ok:false,json:async()=>({detail:rejectJob})};
+    const submitted={id:'job-'+(++nextJob),kind:JSON.parse(init.body).kind,status:'queued',progress:0,message:'Waiting for worker',result:{}};
+    jobs.unshift(submitted);value={id:submitted.id};
+  }
+  else if(path==='/api/projects/test-project/jobs')value=jobs;
   else throw new Error('Unexpected request '+path);
   return {ok:true,json:async()=>structuredClone(value)};
 };
@@ -58,4 +68,36 @@ assert.ok(nodes.get('#modal-root').innerHTML.includes('Voice conversion · optio
 await click('close-modal');
 await click('tab',{tab:'Dialogue'});
 assert.ok(root.innerHTML.includes('An edited English line.'));
-console.log('UI checks passed: editor render, escaped media text, dialogue save, speaker creation, model configuration, and dialogue table.');
+
+// Exercise the user-visible queue and polling path, including an image-subtitle retry.
+await click('save');
+p.demo=false;p.media={name:'Episode.mkv',duration:18,streams:[{index:0,type:'video',codec:'h264',language:'und'},{index:1,type:'audio',codec:'aac',language:'jpn'},{index:2,type:'subtitle',codec:'hdmv_pgs_subtitle',language:'eng'}]};
+p.settings={...p.settings,video_stream:0,audio_stream:1,subtitle_stream:2};
+await click('open-project',{id:p.id});
+assert.ok(root.innerHTML.includes('Prepare without image subtitles'));
+await click('prepare-no-subtitles');
+assert.equal(saved.settings.subtitle_stream,null);
+assert.ok(root.innerHTML.includes('Prepare queued'));
+assert.ok(root.innerHTML.includes('jobs-list'));
+assert.ok(!root.innerHTML.includes('Source is ready'));
+jobs[0]={...jobs[0],status:'running',progress:.51,message:'Creating browser-compatible preview · 32% processed'};
+await timers[1]();
+assert.ok(root.innerHTML.includes('Preparing media · 51%'));
+assert.ok(root.innerHTML.includes('32% processed'));
+jobs[0]={...jobs[0],status:'failed',message:'Selected subtitle track contains images. <img src=x>'};
+await timers[1]();
+assert.ok(root.innerHTML.includes('Prepare failed'));
+assert.ok(nodes.get('#toast-root').innerHTML.includes('Selected subtitle track contains images. &lt;img'));
+assert.ok(!nodes.get('#toast-root').innerHTML.includes('<img src=x>'));
+await click('dismiss-error');
+await click('job',{kind:'prepare'});
+jobs[0]={...jobs[0],status:'completed',progress:1,message:'Complete'};
+p.assets={preview:'preview.mp4',original_audio:'original.wav'};p.revision++;
+await timers[1]();
+assert.ok(root.innerHTML.includes('preview.mp4'));
+assert.ok(!root.innerHTML.includes('Prepare failed'));
+assert.ok(nodes.get('#toast-root').innerHTML.includes('Prepare complete'));
+rejectJob='Select at least one source track in the Clip inspector before Prepare.';
+await click('job',{kind:'prepare'});
+assert.ok(nodes.get('#toast-root').innerHTML.includes(rejectJob));
+console.log('UI checks passed: editor/actions, escaped text, Prepare image-subtitle recovery, queued/running/failed/completed feedback, and immediate validation errors.');

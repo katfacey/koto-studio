@@ -11,7 +11,7 @@ import time
 import uuid
 from pathlib import Path
 
-from .media import atempo_factor, binary, parse_subtitles, probe, write_srt
+from .media import IMAGE_SUBTITLE_CODECS, atempo_factor, binary, parse_subtitles, probe, write_srt
 from .registry import interpreter, local_json
 from .store import ROOT
 from .runtime import executable, runtime_environment
@@ -44,6 +44,17 @@ class Jobs:
         project = self.store.get(pid)
         if not project["media"] and kind in ("prepare","separate","transcribe","diarize","export"):
             raise ValueError("Import source media first")
+        if kind == "prepare":
+            settings = project["settings"]
+            if all(settings.get(key) is None for key in ("video_stream", "audio_stream", "subtitle_stream")):
+                raise ValueError("Select at least one source track in the Clip inspector before Prepare.")
+            sub = settings.get("subtitle_stream")
+            if sub is not None:
+                stream = next((s for s in project["media"]["streams"] if s["index"] == sub and s["type"] == "subtitle"), None)
+                if stream is None:
+                    raise ValueError("Selected subtitle track does not exist")
+                if stream["codec"] in IMAGE_SUBTITLE_CODECS:
+                    raise ValueError("Selected subtitles are images. Set Subtitle track to None in the Clip inspector, then Prepare. Import an SRT/ASS file separately; OCR is not included.")
         if kind in CAPABILITIES:
             cap = CAPABILITIES[kind]
             self.registry.get(project["models"][cap]["id"], cap)
@@ -68,26 +79,37 @@ class Jobs:
         self.check(jid)
         self.store.job_update(jid, progress=value, message=message[:1000])
 
-    def command(self, jid, args, log, progress_base=0, progress_span=1):
+    def command(self, jid, args, log, progress_base=0, progress_span=1, duration=None, message="Processing media"):
         self.check(jid)
+        position = Path(log).stat().st_size if Path(log).exists() else 0
         with open(log, "a", encoding="utf-8") as f:
             proc = subprocess.Popen([str(a) for a in args], stdout=f, stderr=subprocess.STDOUT, env=runtime_environment(python=str(args[0])), start_new_session=os.name != "nt", creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
-        position = Path(log).stat().st_size
+        pending = ""
         try:
-            while proc.poll() is None:
+            while True:
                 self.check(jid)
-                time.sleep(0.15)
                 with open(log, encoding="utf-8", errors="replace") as f:
                     f.seek(position)
                     chunk = f.read()
                     position = f.tell()
-                for line in chunk.splitlines():
+                lines = (pending + chunk).split("\n")
+                pending = lines.pop()
+                for line in lines:
                     if line.startswith("KOTO_EVENT "):
                         try:
                             event = json.loads(line[11:])
                             self.progress(jid, progress_base+float(event["progress"])*progress_span, event["message"])
                         except (ValueError, KeyError):
                             pass
+                    elif duration and line.startswith("out_time_us="):
+                        try:
+                            fraction = max(0, min(0.99, int(line.split("=", 1)[1]) / 1_000_000 / duration))
+                            self.progress(jid, progress_base + fraction * progress_span, f"{message} · {int(fraction * 100)}% processed")
+                        except ValueError:
+                            pass
+                if proc.poll() is not None:
+                    break
+                time.sleep(0.15)
             self.check(jid)
             if proc.returncode:
                 tail = Path(log).read_text(encoding="utf-8", errors="replace")[-1800:]
@@ -105,8 +127,9 @@ class Jobs:
                 proc.wait(timeout=10)
             raise
 
-    def ffmpeg(self, jid, root, *args):
-        self.command(jid, [binary("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y", *args], root / f"{jid}.log")
+    def ffmpeg(self, jid, root, *args, duration=None, progress_base=0, progress_span=1, message="Processing media"):
+        progress_args = ["-progress", "pipe:1", "-nostats", "-stats_period", "0.5"] if duration else []
+        self.command(jid, [binary("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y", *progress_args, *args], root / f"{jid}.log", progress_base, progress_span, duration, message)
 
     def worker(self, jid, project, capability, request, base=0, span=1):
         selection = project["models"][capability]
@@ -171,7 +194,7 @@ class Jobs:
         if audio is not None:
             self.progress(jid,0.1,"Extracting selected audio track")
             path = root / f"{prefix}_original.wav"
-            self.ffmpeg(jid,root,"-i",source,"-map",f"0:{audio}","-vn","-ar","48000","-ac","2","-c:a","pcm_s16le",path)
+            self.ffmpeg(jid,root,"-i",source,"-map",f"0:{audio}","-vn","-ar","48000","-ac","2","-c:a","pcm_s16le",path,duration=project["media"]["duration"],progress_base=.1,progress_span=.24,message="Extracting selected audio track")
             assets["original_audio"] = path.name
         if video is not None:
             self.progress(jid,0.35,"Creating browser-compatible preview")
@@ -180,13 +203,13 @@ class Jobs:
             if audio is not None:
                 args += ["-map",f"0:{audio}","-c:a","aac","-b:a","128k"]
             args += ["-vf","scale=w='min(1280,iw)':h=-2","-c:v","libx264","-preset","veryfast","-crf","24","-pix_fmt","yuv420p","-movflags","+faststart",str(path)]
-            self.ffmpeg(jid,root,*args)
+            self.ffmpeg(jid,root,*args,duration=project["media"]["duration"],progress_base=.35,progress_span=.49,message="Creating browser-compatible preview")
             assets["preview"] = path.name
         sub = project["settings"].get("subtitle_stream")
         subtitles = None
         if sub is not None:
             stream = next(s for s in project["media"]["streams"] if s["index"] == sub)
-            if stream["codec"] in ("hdmv_pgs_subtitle","dvd_subtitle","dvb_subtitle"):
+            if stream["codec"] in IMAGE_SUBTITLE_CODECS:
                 raise ValueError("Selected subtitle track contains images. Import an SRT/ASS file instead; OCR is not included in this version.")
             self.progress(jid,0.85,"Extracting subtitle text")
             path = root / f"{prefix}_subtitles.srt"

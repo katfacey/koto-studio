@@ -19,7 +19,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.concurrency import run_in_threadpool
 
 from .jobs import Jobs, signature
-from .media import binary, parse_subtitles, probe
+from .media import IMAGE_SUBTITLE_CODECS, binary, parse_subtitles, probe
 from .registry import Registry
 from .store import DATA, ROOT, Store
 from .runtime import executable
@@ -272,7 +272,7 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
             p["demo"] = False
             p["name"] = Path(file.filename or "Untitled").stem[:120]
             for kind,key in (("video","video_stream"),("audio","audio_stream"),("subtitle","subtitle_stream")):
-                streams = [s for s in metadata["streams"] if s["type"]==kind]
+                streams = [s for s in metadata["streams"] if s["type"]==kind and (kind != "subtitle" or s["codec"] not in IMAGE_SUBTITLE_CODECS)]
                 p["settings"][key] = streams[0]["index"] if streams else None
             return p
         return store.update(pid,merge)

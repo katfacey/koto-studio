@@ -7,6 +7,7 @@ on:
       - 'scripts/**'
       - 'backend/**'
       - '*.cmd'
+      - 'frontend/**'
       - '.github/workflows/windows-bootstrap.yml'
 permissions:
   contents: read

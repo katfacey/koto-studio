@@ -7,7 +7,7 @@ Windows checks: GitHub-hosted Windows, managed Python 3.11, bundled FFmpeg 9.0.2
 
 The following checks passed:
 
-- Seventeen backend/runtime tests, including HTTP requests through the real ASGI application and
+- Eighteen backend/runtime tests, including HTTP requests through the real ASGI application and
   real FFmpeg media operations. They cover MKV import and track inspection,
   audio extraction, preview encoding, subtitles, imported voice takes, MKV and
   MP4 output, output duration, sample-level placement of voice clips, silent
@@ -15,7 +15,10 @@ The following checks passed:
   reopening, failed export validation, model worker protocol, subprocess
   cancellation, interrupted job history, revision conflicts, voice take
   invalidation, TTS-to-conversion ordering, speaker conversion overrides, and
-  reuse of cached takes.
+  reuse of cached takes. Image subtitle metadata is excluded from default track
+  selection; explicit image-subtitle selection and empty track selection fail
+  before a job starts. Retrying without subtitles produces real audio/preview
+  assets, with FFmpeg progress captured.
 - Managed Windows executable lookup with an empty PATH, rejection of system
   FFmpeg fallback, absolute driver/cancellation paths, app-owned caches and CUDA
   DLL directories, loopback-only translation endpoints, distribution manifests
@@ -23,7 +26,9 @@ The following checks passed:
 - Browser-module JavaScript syntax checks.
 - Renderer/action smoke checks in a minimal DOM harness: editor and timeline
   rendering, escaped user content, dialogue edit/save, speaker creation, model
-  dialog, and dialogue table. The HTTP fixtures in this harness are test data.
+  dialog, and dialogue table. Prepare checks cover the image-subtitle recovery
+  button, queued/running/failed/completed jobs, visible failure messages, and
+  immediate validation errors. The HTTP fixtures in this harness are test data.
 - Python compilation.
 - Dependency-free frontend build.
 - Windows PowerShell 5.1 installation of Piper with the real downloaded Lessac
@@ -38,7 +43,7 @@ configured weights, and a compatible host. They were not installed/executed here
 
 The passing Windows GitHub Actions workflow parses PowerShell installers, installs
 the core with PATH restricted to Windows System32, asserts that Python/FFmpeg are
-app-owned, runs the 17 tests, and starts the actual server/editor. The standalone
+app-owned, runs the 18 tests, and starts the actual server/editor. The standalone
 workflow installs into a path with spaces and reinstalls the core while checking
 that a project-data fixture survives. It also installs and exercises the real
 Piper worker, separately from deterministic protocol fixtures.
