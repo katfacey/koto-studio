@@ -60,3 +60,20 @@ jobs:
             $Page = Invoke-WebRequest http://127.0.0.1:8765/ -UseBasicParsing
             if (-not $Page.Content.Contains('KOTO Studio')) { throw 'Built editor was not served' }
           } finally { if (-not $Server.HasExited) { Stop-Process -Id $Server.Id -Force } }
+      - name: Install into a Pinokio Home path with spaces and preserve data on reinstall
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          $FixtureHome = Join-Path (Get-Location).Path 'runtime\Pinokio Home Fixture'
+          New-Item -ItemType Directory -Force -Path (Join-Path $FixtureHome 'api') | Out-Null
+          $PowerShellExe = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+          & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File scripts\install-pinokio.ps1 -PinokioHome $FixtureHome
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $TargetApp = Join-Path $FixtureHome 'api\koto-studio'
+          if (-not (Test-Path "$TargetApp\runtime\installed.json")) { throw 'Pinokio copy was not bootstrapped' }
+          if (-not (Test-Path "$TargetApp\frontend\dist\index.html")) { throw 'Built editor was not copied' }
+          New-Item -ItemType Directory -Force -Path "$TargetApp\data" | Out-Null
+          Set-Content -LiteralPath "$TargetApp\data\preserve.txt" -Value 'preserve-project-data'
+          & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File scripts\install-pinokio.ps1 -PinokioHome $FixtureHome
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-Content "$TargetApp\data\preserve.txt").Trim() -ne 'preserve-project-data') { throw 'Reinstall overwrote data' }
