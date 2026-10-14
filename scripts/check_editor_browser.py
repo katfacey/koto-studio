@@ -177,7 +177,7 @@ def main():
                         assert fitted['source_end']==original_line['source_end']
                         page.locator('[data-act="export"]').click()
                         assert page.locator(f'.export-issue [data-id="{clip_id}"]').count()==0
-                        page.locator('[data-act="close-modal"]').click()
+                        page.get_by_role('button',name='Back to editor',exact=True).click()
                         page.locator('[data-field="line.end"]').fill(str(original_line['end']));save()
                         page.locator(f'.speaker-card[data-id="{second}"]').click()
                         # Autosave uses the real PATCH endpoint, including typing during a delayed response.
