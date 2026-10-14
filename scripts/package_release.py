@@ -4,7 +4,7 @@ import zipfile
 from release_files import refresh_source_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
-target = ROOT.parent / "KOTO-Studio-v0.2.0.zip"
+target = ROOT.parent / "KOTO-Studio-v0.2.5.zip"
 with zipfile.ZipFile(target,"w",compression=zipfile.ZIP_DEFLATED) as archive:
     for path in refresh_source_manifest(ROOT):
         relative = path.relative_to(ROOT)

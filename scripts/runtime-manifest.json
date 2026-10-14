@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "0.2.0",
+  "version": "0.2.5",
   "python": "3.11",
   "uv": {
     "version": "0.13.0",

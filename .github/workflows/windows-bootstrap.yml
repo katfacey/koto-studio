@@ -55,7 +55,7 @@ jobs:
               if ($Server.HasExited) { throw "Server exited: $(Get-Content runtime\server.stderr.log -Raw)" }
               try {
                 $Health = Invoke-RestMethod http://127.0.0.1:8765/api/health -TimeoutSec 2
-                if ($Health.version -eq '0.2.0' -and $Health.ffmpeg -and $Health.ffprobe) { $Ready = $true; break }
+                if ($Health.version -eq '0.2.5' -and $Health.ffmpeg -and $Health.ffprobe) { $Ready = $true; break }
               } catch { }
               Start-Sleep -Seconds 1
             }

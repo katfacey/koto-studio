@@ -1,0 +1,24 @@
+{
+  "description": "Local AI dubbing studio for Windows + NVIDIA: JP/CN-to-English translation, speaker timelines, reference voices, model adapters, and MKV/MP4 export.",
+  "private": true,
+  "topics": [
+    "dubbing",
+    "video-translation",
+    "ai-translation",
+    "subtitle-translation",
+    "localization",
+    "voice-cloning",
+    "text-to-speech",
+    "tts",
+    "speech-to-text",
+    "speech-recognition",
+    "speaker-diarization",
+    "speech-synthesis",
+    "whisper",
+    "local-first",
+    "pytorch",
+    "python",
+    "cuda",
+    "ollama"
+  ]
+}

@@ -1,6 +1,7 @@
 # Working on KOTO Studio on your Windows PC
 
-Your existing installation is already an editable source workspace:
+Your existing installation is already an editable source workspace. Its folder
+may still be named 0.2.0 after updating the contents to 0.2.5; keep the path unchanged:
 
 ```text
 F:\ai\AI Vibe Code Projects and Output\Programs\koto-studio\KOTO-Studio-v0.2.0

@@ -267,6 +267,13 @@ def main():
                         download=page.locator('.job-row.job-completed a[download]')
                         assert page.request.get(url+download.get_attribute('href')).ok
                         # Return to the labeled sample for the editor screenshot and remaining queue check.
+                        current=project()
+                        restored=page.request.patch(f'{url}/api/projects/{pid}',data={'revision':current['revision'],'dialogue':actual['dialogue']})
+                        assert restored.ok,restored.text()
+                        # Text restoration can invalidate the old take; attach it once text matches.
+                        restored_takes=page.request.patch(f'{url}/api/projects/{pid}',data={'revision':restored.json()['revision'],'dialogue':actual['dialogue']})
+                        assert restored_takes.ok,restored_takes.text()
+                        assert restored_takes.json()['dialogue'][0]['audio']['asset']==first_take
                         page.evaluate('(pid)=>localStorage.setItem("koto-project",pid)',pid)
                         page.reload(wait_until='networkidle')
                         page.locator(f'.speaker-card[data-id="{second}"]').click()

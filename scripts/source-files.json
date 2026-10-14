@@ -1,6 +1,8 @@
 [
+  ".github/repository-metadata.json",
   ".github/workflows/windows-bootstrap.yml",
   ".gitignore",
+  "CHANGELOG.md",
   "Install-Diarization.cmd",
   "Install-Models.cmd",
   "Install-Piper.cmd",
@@ -30,6 +32,9 @@
   "backend/tests/test_runtime.py",
   "backend/tests/test_timing.py",
   "backend/tests/test_workflow.py",
+  "docs/REPOSITORY.md",
+  "docs/SETUP.md",
+  "docs/images/editor-windows.png",
   "frontend/check-layout.mjs",
   "frontend/check-timeline.mjs",
   "frontend/check-ui.mjs",

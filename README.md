@@ -1,330 +1,216 @@
-# KOTO Studio · v0.2.0
+# KOTO Studio · 0.2.5
 
-A local Japanese-to-English dubbing editor for **Windows x64 + NVIDIA**, designed
-around an RTX 5090 with 32 GB VRAM. KOTO installs and runs its own Python, FFmpeg,
-model environments, and optional local translation runtime inside the app folder.
+**A local AI dubbing studio for Windows and NVIDIA GPUs.**
 
-**[Download the complete ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)**
+Turn Japanese or Chinese video dialogue into an editable English dub. Import a
+video, separate dialogue from background audio, identify speakers, translate,
+assign voices, review timing, and render—all from a timeline-based editor.
 
-[Windows validation passed](https://github.com/katfacey/koto-studio/actions/runs/38509517679): 37 backend tests, real Piper/XTTS speaker batches, moved-folder worker repair, and Chromium export timing warnings, Render anyway, full audio tails, autosave, trim, delete/undo, generation and playback checks with only Windows System32 on PATH.
+KOTO is in active development and this repository is **private**. Version 0.2.5
+marks the current working baseline, including the recent editing, generation,
+and export improvements.
 
-## Standalone installation
+[Download source ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)
+· [Setup guide](docs/SETUP.md)
+· [Changelog](CHANGELOG.md)
+· [Validation](VALIDATION.md)
 
-1. Download and extract the **whole ZIP** into a writable folder, such as
-   `C:\KOTO Studio`. Close an older KOTO session before upgrading.
-2. Double-click **Install.cmd**. It downloads verified UV and FFmpeg archives,
-   installs private Python 3.11, and builds the core environment. It neither
-   changes your system PATH nor registers Python as a system installation.
-3. Double-click **Start.cmd**. Start also bootstraps the core if it is missing.
-4. Use **Install-Models.cmd** to select optional voice/audio workers. For local
-   translation, use **Install-Translation.cmd** or the translation choice in
-   that menu. Use **Install-Piper.cmd** to install or repair default voices; use **Install-Reference-Voices.cmd** for original speaker voice matching with XTTS. Restart KOTO after adding optional runtimes.
-5. For automatic speaker diarization, use **Install-Diarization.cmd** as described
-   below. Installing the audio worker package alone does not download gated weights.
+![KOTO Studio editor running on Windows](docs/images/editor-windows.png)
 
-You do not need to install Python, FFmpeg, Node/npm, Ollama, or a CUDA toolkit
-before running these installers. The host requirements are Windows 10/11 x64,
-a browser, a compatible NVIDIA driver for GPU inference, internet for initial
-package/model downloads, and enough disk space.
+*Actual Windows browser screenshot from the validation workflow. The built-in
+sample uses labeled illustration and example dialogue; it includes no source
+video. Real Piper takes are used in the checks. The screenshot may show an earlier
+0.2.x version label; the current release is 0.2.5.*
 
-This is **self-contained after setup**, rather than an offline archive containing
-all binaries and every model. The release ZIP includes source and built UI;
-installation downloads the runtime files into the app directory. Basic voices
-and freely downloadable weights can be installed/downloaded there. Gated models
-require your Hugging Face account. Install-Reference-Voices.cmd downloads official XTTS checkpoints into the app folder.
+## What you can do
 
-The browser editor opens at `http://127.0.0.1:8765`. Keep the standalone terminal
-open; Ctrl+C stops the server and its owned translation process. This is a
-standalone Windows environment with a browser editor, not a signed EXE.
+- **Prepare video and audio.** Inspect MKV/MP4/MOV/WebM tracks, extract audio,
+  create a browser preview, and import text subtitles.
+- **Build an English dub.** Separate vocals/background, transcribe Japanese or
+  Chinese, diarize speakers, translate locally, and edit every line.
+- **Choose voices per character.** Use Piper voices, XTTS with an uploaded sample
+  or the speaker's original dialogue, or a trusted custom model adapter.
+- **Correct the timeline.** Move clips between speaker tracks, retime and trim,
+  reorder speaker lanes, mute tracks, hide video/subtitles, and undo edits.
+- **Generate efficiently.** Piper and XTTS reuse the loaded voice/reference for
+  a speaker's batch. Generate the project, one speaker, or one selected line.
+- **Review and render.** Preview the English mix, see timing hints, adjust speech
+  speed, request alternate translations per clip, and export MKV or MP4.
+- **Keep working safely.** Autosave, editable project data, visible job progress,
+  cancellation, and retry preserve completed voice takes.
 
-## What stays inside the application folder
+## Quick start on Windows
 
-To edit and run the source on your PC, see [LOCAL-WORKSPACE.md](LOCAL-WORKSPACE.md).
+1. **Download and extract the whole ZIP** into a writable folder. Keep the folder
+   contents together. Do not run it from inside the archive.
+2. **Run `Install.cmd`.** It installs private Python, UV, FFmpeg, and the core
+   packages inside that folder.
+3. **Run `Install-Models.cmd`** to choose the AI workers you want. Piper is the
+   simplest starting voice. Install local translation and diarization weights
+   separately if you want those stages.
+4. **Run `Start.cmd`.** The editor opens at `http://127.0.0.1:8765`.
+5. Import a video and follow the workflow below. Keep the terminal open while
+   using KOTO; close the session with Ctrl+C when finished.
 
-| Location | Contents |
+This is a **self-contained Windows environment with a browser editor**. A signed
+Windows executable and a Pinokio installer are not included. You do not need
+system Python, Node/npm, FFmpeg, Ollama, or a separately installed CUDA toolkit.
+Installers use app-owned runtimes and leave your system PATH alone.
+
+### Requirements
+
+| Item | What to expect |
 | --- | --- |
-| `runtime/uv/` | Pinned, checksum-verified bootstrap executable |
-| `runtime/python/` | Private managed Python installation |
-| `runtime/ffmpeg/bin/` | Private FFmpeg, ffprobe, and companion files |
-| `.venv/` | Core backend packages |
-| `.workers/<worker>/` | Isolated AI environments and CUDA runtime libraries |
-| `runtime/models/pyannote/` | Downloaded segmentation/embedding checkpoints and local pipeline YAML |
-| `runtime/cache/` | Python package, Hugging Face, and Torch caches |
-| `runtime/models/xtts/` | Official XTTS reference-voice checkpoints |
-| `runtime/models/piper/` | Downloaded English voice and matching config |
-| `runtime/ollama/` | Optional portable Ollama runtime |
-| `runtime/models/ollama/` | Local translation weights |
-| `runtime/logs/` | Translation server logs |
-| `data/` | Projects, source media, takes, stems, and renders |
+| Operating system | Windows 10/11 x64 and a modern browser |
+| GPU | NVIDIA with a compatible driver for GPU workers; designed around an RTX 5090, 32 GB VRAM |
+| CPU operation | Core editing/export and Piper work without a GPU; XTTS also has a tested CPU path |
+| Storage | Plan for tens of GB for the full model set, plus videos, PCM stems, and render intermediates |
+| Internet | Needed for initial packages/models and any later downloads; configured local inference stays on the machine |
+| Hugging Face account | Needed to accept access agreements and download gated pyannote diarization weights |
 
-Application launches use explicit executable paths. FFmpeg lookups on Windows
-require the managed binaries and do not silently use a system installation.
-Model processes receive their own FFmpeg and CUDA library search directories;
-no user/system PATH changes are made. NVIDIA tools and process cancellation use
-known Windows system/driver locations. An external PATH fallback is available
-only for Linux development or explicit developer opt-in.
+The ZIP contains source and the built editor. It downloads runtime/model files
+at setup; it is **not an offline bundle of all model weights**. GPU inference and
+voice similarity still need evaluation on the target PC.
 
-Installers preserve project data. When migrating an older version, system-Python
-virtual environments are recreated against the private Python. After moving the
-installed folder, rerun Install.cmd and the optional profiles you use to repair
-virtual-environment paths; installed environments are not assumed relocatable.
+### Updating an existing installation
 
-## Streamlined editing and generation
+Close KOTO. Back up the whole `data/` folder, then copy the new ZIP's contents into
+**the existing app folder**. Keep `data/`, `runtime/`, `.venv/`, and `.workers/`.
+Run `Start.cmd` and refresh the editor with **Ctrl+F5**. You do not need to rename
+an older installation folder to match the new version.
 
-Autosave is enabled by default. Edits save after a 1.2-second pause, without blocking
-continued typing. The footer shows Saving, Saved, or a retained-edits error. Toggle
-Autosave in the footer to use manual saves; Ctrl+S still saves immediately. Undo/redo
-remain available after autosave. Unsaved changes still trigger a browser close warning.
+If you move the installation to a different path, rerun `Install.cmd` and the
+optional installers you use to repair virtual environment paths. See the
+[setup guide](docs/SETUP.md) and [local workspace guide](LOCAL-WORKSPACE.md).
 
-Select a clip and press Delete or Backspace to remove it. Text fields keep their
-normal editing shortcuts. Ctrl+Z restores a deleted clip. Selecting a timeline clip
-moves keyboard focus out of the text editor; deletion is blocked during processing.
+## From source video to English dub
 
-Successful generation selects **English mix** and shows a short review toast.
-Playback does not start automatically. Failed/cancelled jobs do not change the mix,
-and historical jobs do not repeatedly switch it back after you choose Original.
+1. **Import and Prepare.** Choose source video/audio/subtitle tracks. Prepare
+   extracts audio and creates a preview. Import SRT, VTT, ASS, or SSA separately
+   when needed. Image-based PGS/DVD/DVB subtitles need external OCR.
+2. **Separate.** Create dialogue and music/effects stems. Listen for residual
+   speech and lost effects; separation quality varies.
+3. **Transcribe and Speakers.** Choose Japanese, Chinese, or automatic detection.
+   Diarization suggests speaker assignments; drag misattributed clips to the
+   correct speaker lane. Manual assignment is also available.
+4. **Translate.** Review the English adaptation beside the source and subtitle
+   reference. Edit meaning, wording, and pacing before generating speech.
+5. **Assign voices and Generate.** Choose project defaults or speaker overrides.
+   Use an uploaded reference or original dialogue with XTTS. Generate missing
+   lines together, or regenerate only the selected line.
+6. **Review.** Successful generation selects **English mix**. Preview takes,
+   adjust timing/levels, and use **Suggest alternatives** for individual lines.
+7. **Export.** Choose separated background, original mix, or silence; choose MKV
+   or MP4. Track mutes and visibility apply to the render. Download the video,
+   mixed WAV, and English subtitles from Export or Jobs.
 
-**Generate** groups missing/outdated lines by speaker. Piper and XTTS load a voice
-once per speaker batch; XTTS also computes the shared sample conditioning once.
-**Generate speaker** runs only the selected character's missing/outdated lines,
-keeping cached and imported takes. **Generate line** still explicitly regenerates
-one clip. Individual takes retain their own timing and are committed as they finish;
-cancelling a batch preserves completed takes, and retry skips those cached lines.
-Custom adapters can opt into batching. Pipelines with a separate conversion adapter
-retain per-line processing to avoid keeping two unrelated GPU workers resident.
+### Timing warnings allow rendering
 
-## Timeline editing and voice timing
+English delivery can be longer than the original line. Clip indicators show
+rough text estimates before synthesis and measured take duration afterward.
+Automatic fitting stays within **0.80–1.25×**; manual speed changes are reversible.
 
-Drag a dialogue clip into another speaker lane to correct attribution. Hold Shift
-to keep its time fixed, or drop on a lane header. Horizontal dragging snaps to the
-source frame rate. Drag a speaker's grip to reorder lanes; focused grips also
-support Arrow Up/Down. Imported takes remain attached; changing an actor clears a
-generated take so it can be regenerated with the correct voice. Undo/redo and Save
-include these edits.
+Export recommends fixing overlong audio and offers **Review clip**, speed fitting,
+or extending into a free gap. You may choose **Render anyway**. Takes play in full
+at their existing start times, so they can overlap later dialogue. Audio that runs
+past the source video's end extends the exported audio duration beyond the video
+track. The choice does not move clips or apply additional speed changes.
 
-Volume buttons mute speaker, original-dialogue and background tracks. Eye buttons
-hide video or subtitles. English mix previews play individual takes and the selected
-background live, so mutes work immediately before export. Render uses the same mute
-and visibility settings; hidden video renders black. In Original monitoring mode,
-speaker mutes gate the raw vocal stem at that actor's original timestamps. Simultaneous
-voices in one raw stem cannot be muted independently; without separation, original
-mix dialogue and background cannot be controlled independently.
+Missing or outdated voice takes still need replacement audio. Detailed timing
+warnings remain in **Jobs** after a successful export.
 
-Small clip dots and the selected line show estimated or measured timing. Estimates
-use English word count, punctuation and the adjustable words-per-minute pace; they
-are hints, not predictions from the selected TTS model. Generate measures the actual
-take. Automatic fit can adjust speed within 0.80–1.25×. Manual speech speed overrides
-auto-fit for that clip; preview and export apply it without overwriting the take.
-Export lists missing or overlong unmuted takes before rendering, with **Review clip**
-to jump to the affected line. **Fit with speech speed** enables modest auto-fit when
-possible. Otherwise **Extend slot** keeps the take and original reference timestamps,
-and extends only into a free gap within the video. This changes the English timing;
-review it against the picture. Fixing overlong audio is recommended, but you can
-choose **Render anyway**.
-The renderer keeps each take's start time and plays its full audio, so voices can overlap.
-If dialogue continues beyond the source video, the export's audio duration extends
-past the video track. No timeline edits or extra speed changes are applied by this
-choice. Export probes every take and records line number, speaker, start time and
-exact excess under timing warnings in Jobs. Missing or outdated takes still need
-replacement audio before rendering.
+## Models and installers
 
-**Suggest alternatives** runs the selected local translation model for one clip.
-It proposes concise, near-target and fuller phrasings; it leaves your adaptation
-unchanged until you click **Use this**. Review meaning and synthesize the chosen
-wording to measure its actual duration. No alternatives are generated for the entire
-project automatically. Local Ollama supports this directly; custom adapters can
-opt in to the alternatives protocol.
+Each processing stage has its own adapter and settings in **Model manager**.
+Voices can override those settings per speaker.
 
-In a speaker's **Voices** inspector, check **Use this speaker's original dialogue
-as voice reference**. KOTO selects XTTS if the current synthesis adapter cannot use
-references. Generate builds and caches up to 12 seconds from non-overlapping source
-lines, using separated vocals when available. At least 3 seconds is required.
-Correct assignments first. Retiming English clips preserves the original reference
-timestamps. Uncheck it to use an uploaded sample; the uploaded file is retained.
-XTTS voice similarity is approximate. Piper uses fixed voices and cannot clone.
-Official [XTTS-v2 weights](https://huggingface.co/coqui/XTTS-v2) use the Coqui Public
-Model License; consult the model page for permitted uses.
-
-If Generate reports a moved or external worker environment, close KOTO and rerun
-Install-Piper.cmd (default Piper) or Install-Reference-Voices.cmd (XTTS) in the current
-folder. This rebuilds the affected environment against app-owned Python and preserves
-project data. **Use project default** inherits Model manager → Synthesis; new projects
-default to Piper.
-
-## Complete a project
-
-1. **Import media.** MKV/MP4/MOV/WebM and other FFmpeg-readable files are
-   inspected. Select video, audio, and subtitle streams in the Clip inspector.
-   Importing another source into an existing media project creates a new project.
-2. **Prepare.** Extract stereo 48 kHz audio and make a browser-compatible H.264
-   proxy. The original video stays unchanged. Text subtitle streams become SRT.
-   Image subtitle tracks (PGS/DVD/DVB) are skipped when selecting default tracks;
-   OCR is not included. If an older project has one selected, choose **None** for
-   Subtitle track in the Clip inspector, or use **Prepare without image subtitles**.
-   Import text subtitles separately, or transcribe the extracted Japanese audio.
-   Prepare opens Jobs and shows live encoding progress; failures also appear in
-   the preview and an error alert.
-3. **Separate.** The Demucs adapter creates dialogue and background stems.
-   Separation quality varies; review effects, breaths, and residual original
-   dialogue. Demucs is a baseline, not a promise of clean dialogue isolation.
-   Alternative separators can be added through the adapter protocol.
-4. **Transcribe / diarize.** Whisper recognizes Japanese or Chinese with timestamps; choose ja, zh or auto in Model manager → Transcription.
-   Subtitle references match by temporal overlap. Pyannote assigns the most
-   overlapping speaker and flags possible overlaps; it does not isolate
-   simultaneously speaking voices. You can assign speakers manually.
-   Missing diarization weights are reported before the job starts, with instructions
-   to run the local setup launcher in the error message.
-5. **Translate.** Local Ollama receives the line, nearby dialogue, subtitle
-   reference, and target duration. English remains editable. Review meaning,
-   pronouns, terminology, and timing; there is no guarantee that an LLM's line
-   will fit until synthesized.
-6. **Generate.** Assign project or speaker voices, attach clean reference audio
-   if needed, and generate individual lines or the whole dialogue list.
-   Synthesized lines are cached. An optional conversion adapter can process TTS
-   output through a pretrained voice model before timing adjustment.
-7. **Review.** Preview takes, edit line timestamps, drag trim handles, change
-   levels, and regenerate. You can import replacement WAV/MP3/FLAC/M4A/OGG takes.
-   Changing English text or voice configuration invalidates generated takes.
-8. **Export.** Choose separated background, original audio (which retains
-   original dialogue), or silence. Export requires a replacement take for every
-   unmuted dialogue line. Modest time stretching is supported; overlong speech is
-   flagged as a recommendation and can be rendered in full with **Render anyway**. MKV copies source video; MP4 encodes
-   H.264. Both include English AAC and an optional English subtitle track. Download the
-   video, mixed WAV, and SRT from Export or completed Jobs.
-
-The sample project is illustrative: it contains editable example dialogue and
-clearly labeled artwork/waveforms. It has no source video or generated voice
-takes. No inference is simulated. A complete manual dub is possible without AI
-workers by importing subtitles and replacement takes.
-
-## Optional model installers
-
-**Install-Models.cmd** presents these choices:
-
-| Choice | Installs | Additional setup |
+| Stage | Included adapter | Installer/setup |
 | --- | --- | --- |
-| Default dubbing workers | Demucs, Pyannote package, Faster Whisper, Piper + English voice | Gated diarization pipeline still needs provisioning; recognition/separation weights download on first use. |
-| XTTS | Reference-conditioned voice worker | Run Install-Reference-Voices.cmd; use original dialogue references or upload a clean sample. |
-| Local translation | Private Ollama + Qwen3 14B | No system Ollama service needed. |
-| All | All workers and local translation | Accept gated diarization access and run its weight setup separately. |
-| Speaker diarization weights | Audio worker plus local pyannote pipeline/weights | Accept Hugging Face access agreements and enter a read token locally. |
+| Dialogue/background separation | Demucs | `Install-Models.cmd` |
+| Speech recognition | faster-whisper | `Install-Models.cmd` |
+| Speaker diarization | pyannote | `Install-Diarization.cmd`; gated model access required |
+| English translation | Local Ollama + Qwen3 | `Install-Translation.cmd` |
+| Fixed English voices | Piper | `Install-Piper.cmd` |
+| Reference-conditioned speech | XTTS-v2 | `Install-Reference-Voices.cmd` |
+| Other models / voice conversion | Custom worker protocol | [Model adapter documentation](models/README.md) |
 
-### Set up speaker diarization
+**Use original dialogue as voice reference** selects XTTS when needed. KOTO builds
+and caches up to 12 seconds of non-overlapping source dialogue; at least 3 seconds
+is required. Changing English clip timing keeps the original reference timestamps.
+Piper uses fixed voices. XTTS approximates the reference voice; results vary.
 
-1. Sign in and accept access agreements for
-   [speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
-   and [segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0).
-2. Create a [Hugging Face read token](https://huggingface.co/settings/tokens).
-3. Double-click **Install-Diarization.cmd** and paste the token into its hidden
-   local prompt. KOTO uses it for model downloads and does not save it.
-4. Restart KOTO and retry **Speakers**. Existing projects with an empty model
-   path automatically use `runtime/models/pyannote/pipeline.yaml`. For an explicit
-   custom path, change it in Model manager → Speaker diarization.
+Generation keeps imported and current cached takes. Cancellation preserves
+completed lines; retry generates the remaining ones. A separate conversion worker
+uses the per-line path unless the integration owns batching itself.
 
-The installer pins each download to its resolved revision and writes a pipeline
-with absolute local checkpoint paths. The diarization worker uses offline Hugging
-Face mode during inference. Model access and GPU inference must be checked on your
-PC; the automated provisioning checks use fixtures and do not approve access agreements.
+[Detailed model setup, download behavior, and storage locations →](docs/SETUP.md)
 
-### Resize the editor
+## Useful controls
 
-Drag the dividers beside the media panel and inspector, above the timeline, or
-above the dialogue editor. Sizes persist in the browser. Double-click a divider
-to reset it; focused dividers also support arrow keys (Shift for larger steps)
-and Home to reset. Dialogue text areas can be resized vertically as well.
+| Action | Control |
+| --- | --- |
+| Play/pause | Space, when outside a text field |
+| Save now | Ctrl+S; autosave is enabled by default |
+| Delete selected clip | Delete or Backspace, outside text fields |
+| Undo/redo | Ctrl+Z / Ctrl+Shift+Z |
+| Correct a speaker | Drag the clip to another speaker lane; hold Shift to preserve its time |
+| Reorder speaker tracks | Drag a lane grip; focused grips support arrow keys |
+| Resize panels | Drag dividers; double-click to reset |
+| Mute/hide tracks | Speaker/volume or eye controls on the track |
 
-Torch 2.7.1/torchaudio 2.7.1 CUDA 12.8 wheels supply GPU libraries. The Whisper worker
-also gets those local cuBLAS/cuDNN libraries; no separate CUDA toolkit or DLL
-PATH setup is required by the managed installer. GPU compatibility is checked
-with `scripts/check_gpu.py` during installation, but inference still depends on
-model compatibility and your NVIDIA driver.
+## Troubleshooting
 
-Piper setup downloads the English Lessac medium voice and config from one
-immutable Hugging Face revision, verifies the ONNX LFS checksum, and selects
-`runtime/models/piper/en_US-lessac-medium.onnx` by default for new projects.
-Existing projects with an empty/old voice path can select that path in Model
-manager. Piper does not clone voices. XTTS can use speaker reference samples.
+| Symptom | What to check |
+| --- | --- |
+| Prepare fails on subtitles | Set Subtitle track to None and Prepare again; import text subtitles separately. OCR is not included. |
+| Diarization needs a pipeline YAML | Run `Install-Diarization.cmd` after accepting the Hugging Face access agreements. |
+| Generate mentions an older/moved Python | Close KOTO and rerun the selected worker's installer in the current folder. |
+| Generate has no English text | Translate or enter an English adaptation first. |
+| Generated voices seem silent | Select English mix; check speaker and monitor mutes and the background choice. |
+| Render is disabled | Check for missing unmuted takes, missing source video, or an active job. Long timing alone is a warning. |
+| A job fails or appears stuck | Open Jobs for the exact status/error. Cancel or retry using the current project settings. |
+| Browser still shows old behavior | Restart KOTO and press Ctrl+F5. |
 
-Ollama runs at **127.0.0.1:11435**, separate from the conventional system Ollama
-port. Start automatically launches the app-owned runtime when installed and
-stops only the process it started. Installation stores weights under
-`runtime/models/ollama`. To install another local translation model:
+## Current boundaries
 
-```powershell
-& "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile translation -TranslationModel "qwen3:8b"
-```
+KOTO 0.2.5 is an editable dubbing workflow, not a full general-purpose video editor.
+It does not include video inpainting, automatic lip sync, subtitle OCR, isolated
+sources for simultaneously speaking characters, a bundled pretrained RVC model,
+cloud inference, or a signed desktop installer. Custom adapters can connect other
+local tools. Native pywebview mode is optional and needs additional setup.
 
-Set the same model name in Model manager. Local inference is the default; cloud
-models are not installed by this setup. The queue runs one processing job at a
-time and releases model workers between stages. Ollama uses `keep_alive: 0`.
+Project data lives in `data/`; original media and generated assets stay on disk.
+Back up the **whole folder**. Project JSON alone is not a media bundle, and automatic
+cache cleanup and project JSON reimport are not included yet.
 
-Core downloads are a few hundred MB plus installed files. Default GPU workers
-require several GB; local translation needs roughly 12 GB including its runtime
-and Qwen3 14B. Allow roughly 20+ GB for all runtimes, plus source media, PCM stems,
-and intermediate renders. Download sizes vary with upstream package versions.
-Model files are not committed to GitHub.
+## Development and validation
 
-## Project data and extensibility
-
-`data/studio.sqlite` stores projects and job history. Original media, preview
-proxies, stems, references, takes, and renders live under
-`data/projects/<project-id>/`. Save edits with Ctrl+S or the Save button; actions
-that submit work also save first. Undo/redo is available for local edits.
-
-Back up the **whole `data` folder**. Downloaded project JSON is metadata, not a
-self-contained media bundle. There is no project JSON reimport UI yet. Cached
-and abandoned artifacts are retained; automatic cache cleanup is not included.
-Allow substantial disk space for PCM stems and render intermediates.
-
-Jobs capture a project revision. Failed/interrupted jobs can be retried using
-current settings; generated lines completed before cancellation are preserved.
-The first release does not resume a model halfway through a single line.
-
-See [models/README.md](models/README.md) for argument-array worker commands,
-requests/results, progress events, and optional voice conversion. Add trusted
-adapters locally and restart the backend. Model availability indicates a worker
-package/executable is installed; it does not mean its weights are configured or
-GPU inference has passed.
-
-## Development and verification
-
-On a managed Windows installation:
+The backend uses Python/FastAPI, SQLite projects, FFmpeg media processing, and
+isolated model workers. The frontend is dependency-free JavaScript, HTML, and CSS.
 
 ```powershell
-& ".\runtime\uv\uv.exe" --no-config pip install --python ".\.venv\Scripts\python.exe" -r backend\requirements-dev.txt
-& ".\.venv\Scripts\python.exe" -m unittest discover -s backend\tests -v
+# From an installed Windows app folder:
+& '.\.venv\Scripts\python.exe' scripts\build_frontend.py
+& '.\runtime\uv\uv.exe' --no-config pip install --python '.\.venv\Scripts\python.exe' -r backend\requirements-dev.txt
+& '.\.venv\Scripts\python.exe' -m unittest discover -s backend\tests -v
 ```
 
-Linux development can use an explicit Python environment and installed FFmpeg:
+Node is optional for frontend checks: `node frontend/check-ui.mjs`,
+`node frontend/check-timeline.mjs`, and `node frontend/check-layout.mjs`.
+The API reference is served at `/docs` while KOTO runs.
 
-```bash
-python -m pip install -r backend/requirements-dev.txt
-python scripts/build_frontend.py
-python scripts/serve.py
-python -m unittest discover -s backend/tests -v
-```
+The established baseline passed **37 backend tests**, actual Windows Chromium
+editing/playback/export checks, and real Piper/XTTS batch synthesis using app-owned
+runtimes with only Windows System32 on PATH. See [VALIDATION.md](VALIDATION.md) for
+reproducible checks, exact run links, and what still needs target-machine testing.
 
-Node is optional for development checks:
-`node frontend/check-ui.mjs` and `node frontend/check-layout.mjs`.
-API documentation is at `/docs`. The Windows GitHub Actions workflow exercises
-core installation and the HTTP/media tests with PATH limited to Windows System32.
-See [VALIDATION.md](VALIDATION.md) and the repository's Actions tab for results.
-GPU inference and native-window behavior still need validation
-on the actual target machine.
+## Upstream projects
 
-Optional native window uses pywebview and Windows WebView2. Install pywebview into
-the private core environment using its UV executable, then launch
-`.venv\Scripts\python.exe scripts\launch.py --desktop`. Browser mode has no
-additional native-window dependency.
+KOTO builds on [FFmpeg](https://ffmpeg.org/), [faster-whisper](https://github.com/SYSTRAN/faster-whisper),
+[Demucs](https://github.com/facebookresearch/demucs), [pyannote](https://github.com/pyannote/pyannote-audio),
+[Piper](https://github.com/OHF-Voice/piper1-gpl), [Coqui TTS](https://github.com/idiap/coqui-ai-TTS),
+and [Ollama](https://github.com/ollama/ollama). Dependency and model licenses apply
+separately; official [XTTS-v2 weights](https://huggingface.co/coqui/XTTS-v2) use the
+Coqui Public Model License. Review the relevant upstream terms when choosing a model.
 
-## Scope
-
-This release is a dubbing foundation, not a mature NLE. It does not include
-video inpainting, sexual-content uncensoring, automatic lip sync or OCR,
-speaker-overlap source separation, a pretrained RVC bundle, multi-channel spatial
-mixing, a signed installer, or hosted model processing. Subtitles match by time
-overlap; dedicated forced alignment and automatic translation repair loops remain
-later work. Custom model adapters, including RVC/UVR bridges, use the protocol in
-[models/README.md](models/README.md).
-
-The latest actual Windows editor screenshot is available in the [validation artifact](https://github.com/katfacey/koto-studio/actions/runs/38509517679/artifacts/11869880402). It uses the labeled sample project and real Piper takes; GPU voice similarity must be evaluated on the target PC.
+[Prepared repository description and researched topics](docs/REPOSITORY.md)
