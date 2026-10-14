@@ -245,6 +245,7 @@ root.addEventListener('click',async e=>{
   if(act==='preview-designed-voice'){preview(S.p.voice_designs.find(d=>d.id===el.dataset.id)?.asset);return;}
   if(act==='assign-library-voice')return assignVoice(el.dataset.id,false,Number(el.dataset.version));
   if(act==='archive-library-voice')return safe(async()=>{await api(`/voices/${el.dataset.id}/archive`,{archived:el.dataset.archived==='true'});voiceProfiles=await api('/voices');},'Updating library');
+  if(act==='update-clip-profile')return assignVoice(el.dataset.id,true);
   if(act==='clip-reference')return importFile(`dialogue/${line().id}/reference`,'.wav,.mp3,.flac,.m4a,.ogg');
   if(act==='preview-clip-reference'){preview(line()?.voice?.reference);return;}
   if(act==='clear-clip-voice'){edit(()=>{line().voice={};if(line().audio?.kind==='generated')line().audio=null;},true);return;}

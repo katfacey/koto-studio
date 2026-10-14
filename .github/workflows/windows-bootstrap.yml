@@ -110,6 +110,7 @@ jobs:
           path: |
             KOTO Studio/runtime/validation/koto-editor.png
             KOTO Studio/runtime/validation/koto-separation.png
+            KOTO Studio/runtime/validation/koto-voice-library.png
 
   reference-voice-worker:
     runs-on: windows-latest

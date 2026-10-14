@@ -129,6 +129,7 @@ class VoiceLibrary:
             raise ValueError('Voice description must be at most 4000 characters')
         validate_voice(config, self.registry)
         adapter = self.registry.get(config['adapter'], 'synthesis')
+        if adapter['id']=='qwen-design':raise ValueError('Generate a voice audition, then save its recording as a reusable reference voice')
         with self.store.lock:
             previous = self.get(profile_id) if profile_id else None
             if previous and expected_version != previous['version']:

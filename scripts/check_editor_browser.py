@@ -297,6 +297,34 @@ def main():
                         page.screenshot(path=str(output / 'koto-separation.png'), full_page=True)
                         page.locator('[data-act="close-modal"]').click()
                         page.locator('[data-act="save"]').click()
+                        # Reusable voices and takes use real backend endpoints and actual Piper output.
+                        page.locator(f'.speaker-card[data-id="{second}"]').click()
+                        page.locator('[data-act="voice-library"]').click()
+                        page.locator('.modal-voice-library').wait_for()
+                        page.locator('[data-field="library.name"]').fill('Recurring test character')
+                        page.locator('[data-act="save-library-voice"]').click()
+                        page.locator('.voice-library-row').filter(has_text='Recurring test character').wait_for(timeout=60000)
+                        profile=page.request.get(url+'/api/voices').json()[0]
+                        page.locator(f'[data-act="assign-library-voice"][data-id="{profile["id"]}"]').click()
+                        page.locator('[data-act="close-modal"]').click()
+                        assert project()['speakers'][1]['voice_profile']['version']==1
+                        page.locator('[data-act="timeline-tab"]').click()
+                        page.locator('[data-field="clip.reference_text"]').fill('Clip-only override')
+                        save()
+                        assert project()['dialogue'][0]['voice']['reference_text']=='Clip-only override'
+                        assert not project()['dialogue'][1].get('voice',{}).get('reference_text')
+                        history=project()['takes'][clip_id]
+                        assert len(history)>=1
+                        page.locator('[data-field="selected-take"]').select_option(history[0]['id'])
+                        page.wait_for_function("document.querySelector('.take-status')?.textContent.includes('Voice ready')")
+                        assert project()['dialogue'][0]['audio']['asset']==history[0]['audio']['asset']
+                        page.locator(f'.speaker-card[data-id="{second}"]').click()
+                        page.locator('[data-act="voice-library"]').click()
+                        page.locator('[data-act="revise-library-voice"]').click()
+                        page.locator('.voice-library-row').filter(has_text='Recurring test character').filter(has_text='Version 2').wait_for(timeout=60000)
+                        assert project()['speakers'][1]['voice_profile']['version']==1
+                        page.screenshot(path=str(output/'koto-voice-library.png'),full_page=True)
+                        page.locator('[data-act="close-modal"]').click()
                         # The queue data below is an explicit UI fixture; no inference is simulated.
                         fixture = [{"id": "ui-fixture", "kind": "prepare", "status": "running", "progress": .5, "message": "UI fixture progress", "result": {}}]
                         page.route('**/api/projects/*/jobs', lambda route: route.fulfill(json=fixture))
