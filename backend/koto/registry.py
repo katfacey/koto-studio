@@ -39,6 +39,8 @@ def interpreter(adapter):
         if managed not in text:
             installer = {"piper": "Install-Piper.cmd", "xtts": "Install-Reference-Voices.cmd", "separator": "Install-Separation.cmd"}.get(env, "Install-Models.cmd")
             raise RuntimeError(f"The {env} worker points outside the current app folder, possibly because the app was moved. Close KOTO, run {installer} in this folder to repair it, then restart.")
+    if env == "separator" and not path.exists():
+        raise RuntimeError("The isolated separation worker is missing. Run Install-Separation.cmd, then restart KOTO.")
     return str(path) if path.exists() else sys.executable
 
 

@@ -8,9 +8,15 @@ from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from koto import separation
+from koto.registry import interpreter
 
 
 class ProvisionTests(unittest.TestCase):
+    def test_missing_separator_environment_never_falls_back_to_editor_python(self):
+        with tempfile.TemporaryDirectory() as temp, patch('koto.registry.ROOT',Path(temp)), patch.dict('os.environ',{},clear=True):
+            with self.assertRaisesRegex(RuntimeError,'Install-Separation.cmd'):
+                interpreter({'environment':'separator'})
+
     def test_verified_download_cache_corruption_cancellation_and_unknown_model(self):
         with tempfile.TemporaryDirectory() as temp:
             directory=Path(temp)
