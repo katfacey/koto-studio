@@ -109,7 +109,9 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(active,first['id'])
         stems={key:self.p['assets'][key] for key in ('vocals','background')}
         # A preview must preserve every downstream render asset, not just stems.
-        self.app.state.store.update(self.pid,lambda p:{**p,'assets':{**p['assets'],'export':'saved-export.mkv'}})
+        self.p=self.app.state.store.update(self.pid,lambda p:{**p,'assets':{**p['assets'],'export':'saved-export.mkv'}})
+        await self.patch(models={**self.p['models'],'separation':{'id':'separator-fixture','settings':{'delay':.01}}})
+        self.assertEqual(self.p['assets']['export'],'saved-export.mkv')
         preview=await self.submit_separation({'preview':True,'start':1,'end':2.5})
         self.assertFalse(preview['result']['applied'])
         self.assertEqual(self.p['active_separation'],active)

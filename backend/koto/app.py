@@ -283,7 +283,11 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
                 if line.get("audio") and line["audio"].get("kind")=="generated" and line["audio"].get("signature")!=signature(p,line):
                     line["audio"] = None
                     line["warning"] = "Text or voice changed. Regenerate this line."
-            if any(p[k]!=previous_export[k] for k in previous_export):
+            # Choosing a model for a prospective separation preview does not
+            # change the active stems or any existing render.
+            old_render_models = {k:v for k,v in previous_export['models'].items() if k != 'separation'}
+            new_render_models = {k:v for k,v in p['models'].items() if k != 'separation'}
+            if old_render_models != new_render_models or any(p[k]!=previous_export[k] for k in ('dialogue','speakers','settings')):
                 for key in ("export","dub_audio","english_subtitles"):
                     p["assets"].pop(key,None)
             if any(p["settings"].get(k)!=previous_settings.get(k) for k in ("audio_stream","video_stream","subtitle_stream")):
