@@ -1,10 +1,12 @@
 # Validation · KOTO Studio
 
-## Development branch: character voice library and Qwen
+## 0.3.0 feature baseline: character voice library and Qwen
 
 **[Windows voice-library validation passed](https://github.com/katfacey/koto-studio/actions/runs/38637758558).**
 This validates runtime commit `7fa562985094081e86701fea97cfab40dfe68a06`.
-The following documentation/image/manifest update does not change its runtime code.
+Subsequent documentation/image updates and 0.3.0 version labels retain this feature
+baseline. The release workflow also requires Windows validation to pass for the
+exact release commit before creating its tag and uploading the ZIP.
 
 - All **48 backend tests** passed locally and on Windows, covering versioned
   profile reuse across projects, copied sample independence, explicit version
@@ -29,7 +31,7 @@ Japanese/Chinese reference quality still require target-machine listening/testin
 DramaBox was evaluated from upstream sources; no DramaBox GPU inference or working
 built-in adapter is claimed. See [voice setup and evaluation](docs/VOICES.md).
 
-## Development branch: UVR-style separation
+## Separation feature baseline
 
 **[Windows separation validation passed](https://github.com/katfacey/koto-studio/actions/runs/38632810248).**
 This run validated runtime commit `726edac07a99d95354e69b4dd05aca00164a4a47` with

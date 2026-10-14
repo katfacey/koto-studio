@@ -1,6 +1,6 @@
 # Installation, models, and project storage
 
-[Back to the README](../README.md) · KOTO Studio 0.2.5
+[Back to the README](../README.md) · KOTO Studio 0.3.0
 
 ## What stays inside the application folder
 

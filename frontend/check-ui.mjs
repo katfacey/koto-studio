@@ -30,7 +30,7 @@ const models=Object.entries(p.models).map(([capability,s])=>({id:s.id,label:s.id
 globalThis.fetch=async(path,init={})=>{
   let value;
   if(path==='/api/separation/models')value={models:[{id:'mdx-inst-hq3',label:'MDX fixture',installed:false,size:66759214,architecture:'MDX',fields:[{key:'batch_size',label:'Batch size',type:'number',default:1,min:1,max:16,integer:true}]}]};
-  else if(path==='/api/health')value={version:'0.2.5',local:true,gpu:null};
+  else if(path==='/api/health')value={version:'0.3.0',local:true,gpu:null};
   else if(path==='/api/models')value=models;
   else if(path==='/api/projects'&&init.method==='POST')value=p;
   else if(path==='/api/projects')value=[];

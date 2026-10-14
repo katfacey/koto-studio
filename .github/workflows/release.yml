@@ -1,4 +1,4 @@
-name: Publish 0.2.5 alpha release
+name: Publish 0.3.0 alpha release
 
 on:
   workflow_dispatch:
@@ -9,16 +9,17 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
-  group: koto-release-0.2.5
+  group: koto-release-0.3.0
   cancel-in-progress: false
 
 jobs:
   publish:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,8 +27,39 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Require passing Windows validation for this exact snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, subprocess, time
+          sha = os.environ['GITHUB_SHA']
+          repo = os.environ['GH_REPO']
+          endpoint = f'repos/{repo}/actions/workflows/windows-bootstrap.yml/runs?head_sha={sha}&event=push&per_page=20'
+          deadline = time.monotonic() + 45 * 60
+          while time.monotonic() < deadline:
+              response = subprocess.run(['gh', 'api', endpoint], check=True, capture_output=True, text=True)
+              runs = json.loads(response.stdout)['workflow_runs']
+              runs = [run for run in runs if run['head_sha'] == sha]
+              if runs:
+                  run = max(runs, key=lambda item: item['id'])
+                  print(f"Windows validation {run['id']}: {run['status']} / {run['conclusion']}", flush=True)
+                  if run['status'] == 'completed':
+                      if run['conclusion'] != 'success':
+                          raise SystemExit(f"Release blocked: Windows validation did not pass: {run['html_url']}")
+                      break
+              else:
+                  print('Waiting for Windows validation to start', flush=True)
+              time.sleep(20)
+          else:
+              raise SystemExit('Release blocked: Windows validation timed out or was not triggered')
+          PY
       - name: Package and verify the standalone source ZIP
-        run: python scripts/package_release.py
+        run: |
+          python scripts/package_release.py
+          sha256sum ../KOTO-Studio-v0.3.0.zip
       - name: Publish alpha prerelease
         env:
           GH_TOKEN: ${{ github.token }}
@@ -35,38 +67,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          archive="$(dirname "$GITHUB_WORKSPACE")/KOTO-Studio-v0.2.5.zip"
-          notes="$RUNNER_TEMP/koto-release-notes.md"
-          cat > "$notes" <<'NOTES'
-          KOTO Studio 0.2.5 is an **alpha prerelease** of the local Windows/NVIDIA dubbing studio.
-
-          Download **KOTO-Studio-v0.2.5.zip**, extract the whole folder, then run Install.cmd and Start.cmd. AI workers are selected through Install-Models.cmd. This package includes source and the built editor; runtimes and model weights download during setup.
-
-          For an existing installation, close KOTO and copy the archive contents into the existing app folder. Preserve data/, runtime/, .venv/ and .workers/, then restart and refresh with Ctrl+F5.
-
-          KOTO Studio source is MIT licensed; the included LICENSE covers original project code. Third-party dependencies and model weights retain their upstream licenses.
-
-          This baseline includes editable speaker timelines, mutes/visibility, source/reference voices, speaker-batched Piper/XTTS generation, autosave, keyboard deletion/undo, timing suggestions and reversible speed fitting. Export recommends timing fixes while allowing Render anyway and preserving full voice takes.
-
-          The runtime baseline passed 37 backend tests and Windows Chromium installation/editing/export checks, plus real Piper and XTTS CPU batches: https://github.com/katfacey/koto-studio/actions/runs/38520342988
-
-          Alpha limitations: no video inpainting, subtitle OCR, automatic lip sync, hosted inference or signed Windows executable. GPU inference and subjective voice matching still need target-machine evaluation. See README.md, CHANGELOG.md and VALIDATION.md in the archive.
-          NOTES
-          if gh release view v0.2.5 >/dev/null 2>&1; then
-            tagged=$(gh api "repos/$GH_REPO/commits/v0.2.5" --jq .sha)
+          archive="$(dirname "$GITHUB_WORKSPACE")/KOTO-Studio-v0.3.0.zip"
+          notes="docs/releases/v0.3.0.md"
+          # Never move a previously published tag to a different snapshot.
+          if gh api "repos/$GH_REPO/git/ref/tags/v0.3.0" >/dev/null 2>&1; then
+            tagged=$(gh api "repos/$GH_REPO/commits/v0.3.0" --jq .sha)
             if [[ "$tagged" != "$GITHUB_SHA" ]]; then
-              # Complete the fresh alpha with its MIT license. Move only the
-              # initial release tag, with a lease; later snapshots stay immutable.
-              if [[ "$tagged" != "aabf3d5c954b69a864683667f4708b5758121e81" ]]; then
-                echo "v0.2.5 already points to another snapshot. Publish a new version instead."
-                exit 1
-              fi
-              gh auth setup-git
-              git push --force-with-lease="refs/tags/v0.2.5:$tagged" origin "$GITHUB_SHA:refs/tags/v0.2.5"
+              echo 'v0.3.0 already points to another snapshot. Publish a new version instead.'
+              exit 1
             fi
-            gh release edit v0.2.5 --title "KOTO Studio 0.2.5 Alpha" --prerelease --notes-file "$notes"
-            gh release upload v0.2.5 "$archive" --clobber
-          else
-            gh release create v0.2.5 "$archive" --target "$GITHUB_SHA" --title "KOTO Studio 0.2.5 Alpha" --prerelease --notes-file "$notes"
           fi
-          gh release view v0.2.5 --json url,tagName,isPrerelease,assets
+          if gh release view v0.3.0 >/dev/null 2>&1; then
+            gh release edit v0.3.0 --title "KOTO Studio 0.3.0 Alpha" --prerelease --notes-file "$notes"
+            gh release upload v0.3.0 "$archive" --clobber
+          else
+            gh release create v0.3.0 "$archive" --target "$GITHUB_SHA" --title "KOTO Studio 0.3.0 Alpha" --prerelease --notes-file "$notes"
+          fi
+          gh release view v0.3.0 --json url,tagName,isPrerelease,assets

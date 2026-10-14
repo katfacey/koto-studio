@@ -1,6 +1,6 @@
 # Reusable character voices
 
-This feature is on the development branch. The released 0.2.5 ZIP remains unchanged.
+Included in 0.3.0 Alpha. The earlier 0.2.5 ZIP remains an unchanged historical release.
 The current controls are a first pass; library APIs and stored snapshots can serve
 an upgraded voice interface later.
 

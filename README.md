@@ -6,10 +6,11 @@ Turn Japanese or Chinese video dialogue into an editable English dub. Import a
 video, separate dialogue from background audio, identify speakers, translate,
 assign voices, review timing, and render—all from a timeline-based editor.
 
-KOTO is in active development. Version 0.2.5 marks the current working baseline, including the recent editing, generation,
-and export improvements.
+KOTO is in active development. Version **0.3.0 Alpha** adds UVR-style vocal
+separation, a reusable character voice library, and local Qwen3-TTS cloning and
+voice design, with independent per-clip settings and saved takes.
 
-[Download 0.2.5 alpha ZIP](https://github.com/katfacey/koto-studio/releases/download/v0.2.5/KOTO-Studio-v0.2.5.zip)
+[Download 0.3.0 alpha ZIP](https://github.com/katfacey/koto-studio/releases/download/v0.3.0/KOTO-Studio-v0.3.0.zip)
 · [Source ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)
 · [Setup guide](docs/SETUP.md)
 · [Changelog](CHANGELOG.md)
@@ -39,11 +40,12 @@ The current state is more of a *proof of concept* rather than a true-blue piece 
 - **Build an English dub.** Separate vocals/background, transcribe Japanese or
   Chinese, diarize speakers, translate locally, and edit every line.
 - **Choose voices per character.** Use Piper voices, XTTS with an uploaded sample
-  or the speaker's original dialogue, or a trusted custom model adapter.
+  or the speaker's original dialogue, Qwen3-TTS cloning/design, or a trusted custom
+  model adapter. Save versioned character voices for reuse across projects.
 - **Correct the timeline.** Move clips between speaker tracks, retime and trim,
   reorder speaker lanes, mute tracks, hide video/subtitles, and undo edits.
-- **Generate efficiently.** Piper and XTTS reuse the loaded voice/reference for
-  a speaker's batch. Generate the project, one speaker, or one selected line.
+- **Generate efficiently.** Compatible Piper, XTTS and Qwen lines share a loaded
+  voice/reference while retaining independent clip settings. Generate the project, one speaker, or one selected line.
 - **Review and render.** Preview the English mix, see timing hints, adjust speech
   speed, request alternate translations per clip, and export MKV or MP4.
 - **Keep working safely.** Autosave, editable project data, visible job progress,
@@ -183,7 +185,7 @@ uses the per-line path unless the integration owns batching itself.
 
 ## Current boundaries
 
-KOTO 0.2.5 is an editable dubbing workflow, not a full general-purpose video editor.
+KOTO 0.3.0 is an editable dubbing workflow, not a full general-purpose video editor.
 It does not include video inpainting, automatic lip sync, subtitle OCR, isolated
 sources for simultaneously speaking characters, a bundled pretrained RVC model,
 cloud inference, or a signed desktop installer. Custom adapters can connect other
@@ -193,10 +195,10 @@ Project data lives in `data/`; original media and generated assets stay on disk.
 Back up the **whole folder**. Project JSON alone is not a media bundle, and automatic
 cache cleanup and project JSON reimport are not included yet.
 
-## Separation workspace (development branch)
+## Separation workspace
 
-The new separation controls are on `main`; the **0.2.5 alpha ZIP keeps its original
-release contents**. Use Download source (main) to test these additions.
+Included in **0.3.0 Alpha**: UVR-style MDX-Net, VR and BS-RoFormer engines through
+an isolated audio-separator worker. No separate UVR5 application is required.
 
 1. Run **Install-Separation.cmd**, then restart KOTO. This installs a dedicated
    `.workers/separator` environment using app-owned Python,
@@ -231,7 +233,7 @@ The panel is a functional first pass. Backend APIs own model provisioning and
 result history so a future GUI redesign can reuse them; see
 [separation API and architecture](docs/SEPARATION.md).
 
-## Reusable character voices (development branch)
+## Reusable character voices
 
 Save speaker voices to a shared library, assign them in other projects, and keep
 specific profile versions pinned. The clip inspector adds independent engine,
@@ -247,8 +249,8 @@ redesign can reuse the same library APIs.
 [Actual Windows voice-library screenshot](docs/images/voice-library-windows.png).
 See [voice setup, storage and API](docs/VOICES.md). DramaBox has been evaluated as
 an expressive future engine; it is not presented as a working built-in adapter
-without Windows/5090 validation. These additions are on `main`, not in the
-unchanged 0.2.5 release ZIP.
+without Windows/5090 validation. The **0.3.0 Alpha** library follows a
+Voicebox-inspired workflow; it does not require the external Voicebox application.
 
 ## Development and validation
 
@@ -266,9 +268,9 @@ Node is optional for frontend checks: `node frontend/check-ui.mjs`,
 `node frontend/check-timeline.mjs`, and `node frontend/check-layout.mjs`.
 The API reference is served at `/docs` while KOTO runs.
 
-The established baseline passed **37 backend tests**, actual Windows Chromium
-editing/playback/export checks, and real Piper/XTTS batch synthesis using app-owned
-runtimes with only Windows System32 on PATH. See [VALIDATION.md](VALIDATION.md) for
+The current feature baseline passed **48 backend tests**, actual Windows Chromium
+editing/playback/export checks, real Piper/XTTS/Qwen inference, and all three
+separation engines using app-owned runtimes with only Windows System32 on PATH. See [VALIDATION.md](VALIDATION.md) for
 reproducible checks, exact run links, and what still needs target-machine testing.
 
 ## Planned improvements

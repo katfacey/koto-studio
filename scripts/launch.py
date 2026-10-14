@@ -22,7 +22,7 @@ def health():
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         with opener.open(URL + "/api/health",timeout=2) as response:
             result = json.load(response)
-            return result.get("local") is True and result.get("version") == "0.2.5"
+            return result.get("local") is True and result.get("version") == "0.3.0"
     except Exception:
         return False
 

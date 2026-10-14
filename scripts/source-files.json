@@ -51,6 +51,7 @@
   "docs/images/editor-windows.png",
   "docs/images/separation-windows.png",
   "docs/images/voice-library-windows.png",
+  "docs/releases/v0.3.0.md",
   "frontend/check-layout.mjs",
   "frontend/check-separation.mjs",
   "frontend/check-timeline.mjs",
