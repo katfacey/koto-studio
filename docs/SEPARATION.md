@@ -46,8 +46,7 @@ Nothing is written to Windows' user/system PATH.
 The catalog exposes three vocal/instrumental models. Bundled UVR metadata and the
 RoFormer YAML come from TRvlvr/application_data commit
 `3826b05b570dbd4fbedbc807758803b35348ba1b`. Download jobs use catalog-controlled
-HTTPS URLs, atomic file replacement, expected sizes, SHA-256 verification when
-pinned, UVR metadata identification for MDX/VR, and SHA-256 receipts. A repeat
+HTTPS URLs, atomic file replacement, expected sizes, pinned SHA-256 verification, UVR metadata identification for MDX/VR, and SHA-256 receipts. A repeat
 request verifies the installed file. Inference verifies weights and overrides
 upstream download/metadata lookup with these local resources.
 

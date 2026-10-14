@@ -6,6 +6,7 @@ on:
     paths:
       - 'scripts/**'
       - 'backend/**'
+      - 'models/separation/**'
       - '*.cmd'
       - 'frontend/**'
       - '.github/workflows/windows-bootstrap.yml'
