@@ -175,4 +175,9 @@ await click('separation-selection');
 assert.ok(nodes.get('#modal-root').innerHTML.includes('data-separation-range="start"'));
 await click('save');assert.equal(saved.models.separation.settings.batch_size,1);
 await click('close-modal');
+// Explicit saved-take approval remains visible even when audio is ready.
+p.dialogue[0].audio={asset:'approved.wav',kind:'generated',duration:1,accepted_signature:'fixture'};
+p.dialogue[0].warning='Saved take selected for changed text/voice. Listen before exporting.';
+p.revision++;await click('open-project',{id:p.id});await click('timeline-tab');
+assert.ok(root.innerHTML.includes('Saved take selected for changed text/voice. Listen before exporting.'));
 console.log('UI checks passed: completion mode/toast, keyboard deletion/undo, protected typing, debounced autosave, in-flight edits, save failure recovery, and existing editor/queue flows.');
