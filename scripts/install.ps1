@@ -119,7 +119,7 @@ function Install-StudioWorker([string]$Worker) {
         Invoke-Checked $UvExe @("--no-config", "pip", "install", "--python", $WorkerPython, "torchvision==0.22.1", "--index-url", "https://download.pytorch.org/whl/cu128")
     }
     switch ($Worker) {
-        "separator" { $Packages = @("audio-separator==0.47.0", "onnxruntime-gpu==1.22.1", "-c", (Join-Path $PSScriptRoot "separator-constraints.txt"), "--override", (Join-Path $PSScriptRoot "separator-overrides.txt")) }
+        "separator" { $Packages = @("audio-separator==0.47.0", "onnxruntime-gpu==1.22.0", "-c", (Join-Path $PSScriptRoot "separator-constraints.txt"), "--override", (Join-Path $PSScriptRoot "separator-overrides.txt")) }
         "whisper" { $Packages = @("faster-whisper>=1.1,<2", "ctranslate2>=4.6,<5") }
         "audio" { $Packages = @("demucs>=4,<5", "pyannote.audio>=3.3,<4", "-c", (Join-Path $PSScriptRoot "torch-constraints.txt")) }
         "piper" { $Packages = @("piper-tts>=1.3,<2") }

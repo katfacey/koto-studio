@@ -53,3 +53,8 @@ class ProvisionTests(unittest.TestCase):
         self.assertEqual(p['dialogue'][1]['audio']['kind'],'imported')
         self.assertEqual(p['dialogue'][2]['audio']['kind'],'generated')
         self.assertNotIn('source_reference',p['speakers'][0])
+        p['dialogue'][0]['audio']={'kind':'generated'}
+        p['assets']['export']='new.mkv'
+        separation.activate(p,result)
+        self.assertEqual(p['dialogue'][0]['audio']['kind'],'generated')
+        self.assertEqual(p['assets']['export'],'new.mkv')

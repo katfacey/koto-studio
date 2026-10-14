@@ -29,7 +29,8 @@ let rejectJob='';let patchGate=null,patchFailure='';
 const models=Object.entries(p.models).map(([capability,s])=>({id:s.id,label:s.id,capability,available:false,description:'Test worker metadata',fields:[]}));
 globalThis.fetch=async(path,init={})=>{
   let value;
-  if(path==='/api/health')value={version:'0.2.5',local:true,gpu:null};
+  if(path==='/api/separation/models')value={models:[{id:'mdx-inst-hq3',label:'MDX fixture',installed:false,size:66759214,architecture:'MDX',fields:[{key:'batch_size',label:'Batch size',type:'number',default:1,min:1,max:16,integer:true}]}]};
+  else if(path==='/api/health')value={version:'0.2.5',local:true,gpu:null};
   else if(path==='/api/models')value=models;
   else if(path==='/api/projects'&&init.method==='POST')value=p;
   else if(path==='/api/projects')value=[];
@@ -161,4 +162,17 @@ assert.equal(p.dialogue[0].translation,'Snapshot before more typing.');await aut
 patchFailure='Test-only disk error';change('Keep this edit if saving fails.');await autosave();assert.ok(nodes.get('#save-status').textContent.includes('changes retained'));
 assert.notEqual(p.dialogue[0].translation,'Keep this edit if saving fails.');patchFailure='';await click('save');assert.equal(p.dialogue[0].translation,'Keep this edit if saving fails.');
 listeners.input({target:{dataset:{field:'autosave'},type:'checkbox',checked:false}});change('Manual-only edit.');assert(![...delayed.values()].some(v=>v.ms===1200));await click('save');
+// The pipeline button opens a replaceable separation panel instead of queuing full inference.
+models.push({id:'audio-separator',capability:'separation',available:false,label:'UVR fixture',fields:[{key:'model',default:'mdx-inst-hq3'},{key:'device',default:'cuda'}]});
+await click('refresh-models');await click('job',{kind:'separate'});
+assert.ok(nodes.get('#modal-root').innerHTML.includes('Separate dialogue and background.'));
+assert.ok(nodes.get('#modal-root').innerHTML.includes('Saved results'));
+listeners.input({target:{dataset:{field:'adapter.separation'},type:'select',value:'audio-separator',closest(){return null;}}});
+assert.ok(nodes.get('#modal-root').innerHTML.includes('Install-Separation.cmd'));
+assert.match(nodes.get('#modal-root').innerHTML,/data-act="separation-preview"[^>]* disabled/);
+listeners.input({target:{dataset:{field:'model.separation.model'},type:'select',value:'mdx-inst-hq3',closest(){return null;}}});
+await click('separation-selection');
+assert.ok(nodes.get('#modal-root').innerHTML.includes('data-separation-range="start"'));
+await click('save');assert.equal(saved.models.separation.settings.batch_size,1);
+await click('close-modal');
 console.log('UI checks passed: completion mode/toast, keyboard deletion/undo, protected typing, debounced autosave, in-flight edits, save failure recovery, and existing editor/queue flows.');

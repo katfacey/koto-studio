@@ -38,7 +38,7 @@ voice takes while preserving imported takes and fixed/uploaded-reference voices.
 
 `Install-Separation.cmd` creates `.workers/separator` with app-owned Python 3.11,
 Torch 2.7.1 cu128, torchvision 0.22.1, audio-separator 0.47.0 and ONNX Runtime GPU
-1.22.1. NumPy 2 dependencies are isolated from Demucs/pyannote. A uv override uses
+1.22.0. NumPy 2 dependencies are isolated from Demucs/pyannote. A uv override uses
 samplerate 0.2.2's Windows wheel instead of upstream's old 0.1.0 source build.
 App-owned FFmpeg and worker DLL directories enter only the child process PATH.
 Nothing is written to Windows' user/system PATH.

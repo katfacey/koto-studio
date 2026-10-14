@@ -159,6 +159,8 @@ def activate(project, result):
         raise ValueError('A preview cannot replace the full project audio')
     if result['source_asset'] != project['assets'].get('original_audio'):
         raise ValueError('This result belongs to an earlier prepared source; separate the current source')
+    if project.get('active_separation') == result['id'] and all(project['assets'].get(k) == result['assets'][k] for k in ('vocals', 'background')):
+        return project
     project['assets'].update({k: result['assets'][k] for k in ('vocals', 'background')})
     project['active_separation'] = result['id']
     for key in ('export', 'dub_audio', 'english_subtitles'):
