@@ -224,6 +224,9 @@ for activation. Switching stems invalidates generated takes that use original
 speaker references. History currently grows until the project is removed;
 ensembles and storage cleanup controls are future work.
 
+[Windows screenshot of the separation panel](docs/images/separation-windows.png)
+shows its model setup state before installing the new worker and weights.
+
 The panel is a functional first pass. Backend APIs own model provisioning and
 result history so a future GUI redesign can reuse them; see
 [separation API and architecture](docs/SEPARATION.md).

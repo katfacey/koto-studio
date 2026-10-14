@@ -352,9 +352,14 @@ class Jobs:
         root = self.store.project_dir(project["id"])
         source = self.store.asset(project["id"], original)
         comparison = original
-        if preview:
+        source_duration = probe(source)["duration"]
+        if preview and start >= source_duration:
+            raise ValueError("This preview begins after the prepared audio ends. Choose an earlier range.")
+        # MKV audio tracks can end before the video. Pad that existing silence
+        # before inference rather than mistaking it for a broken model output.
+        if preview or abs(source_duration-(end-start)) > .001:
             clipped = root / f"{jid}_comparison.wav"
-            self.ffmpeg(jid,root,"-ss",str(start),"-i",source,"-t",str(end-start),"-ar","48000","-ac","2","-c:a","pcm_s16le",clipped)
+            self.ffmpeg(jid,root,"-ss",str(start),"-i",source,"-af",f"apad,atrim=duration={end-start}","-ar","48000","-ac","2","-c:a","pcm_s16le",clipped)
             source, comparison = clipped, clipped.name
         self.progress(jid,.05,"Separating preview range" if preview else "Separating full source")
         result = self.worker(jid,project,"separation",{"audio":str(source)},base=.05,span=.8)

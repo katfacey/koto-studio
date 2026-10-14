@@ -31,7 +31,8 @@ Workers must return both stems inside their assigned output directory. The backe
 rejects a duration difference over 250 ms, then pads/trims rounding at the tail to
 exact source duration and converts to 48 kHz stereo PCM16. It does not stretch
 speech or repair model-introduced latency. Preview extraction uses exact FFmpeg
-source bounds. Full-result switching clears export caches and original-reference
+source bounds. Shorter container audio is padded with silence to the video duration
+before inference; previews beginning after the prepared audio ends fail clearly. Full-result switching clears export caches and original-reference
 voice takes while preserving imported takes and fixed/uploaded-reference voices.
 
 ## Local models and dependencies

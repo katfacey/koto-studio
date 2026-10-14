@@ -89,8 +89,8 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r.status_code,200,r.text)
         return await self.wait_job(r.json()["id"])
 
-    async def setup_separator_fixture(self, delay=0):
-        await self.upload("media",self.video)
+    async def setup_separator_fixture(self, delay=0, video=None):
+        await self.upload("media",video or self.video)
         await self.run_job("prepare")
         script=Path(self.temp.name)/"separator_fixture.py"
         script.write_text("import json,sys,shutil,time\nfrom pathlib import Path\nr=json.loads(Path(sys.argv[1]).read_text())\ntime.sleep(r['settings'].get('delay',0))\nresult={}\nfor key in ('vocals','background'):\n p=Path(r['output_dir'])/(key+'.wav');shutil.copyfile(r['settings'].get('replacement') or r['audio'],p);result[key]=str(p)\nPath(sys.argv[2]).write_text(json.dumps(result))\n",encoding="utf-8")
@@ -159,6 +159,23 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         await self.wait_job(jid,'cancelled')
         self.assertEqual(self.p['separations'],[])
         self.assertNotIn('vocals',self.p['assets'])
+
+    async def test_separation_pads_shorter_container_audio_without_shortening_video(self):
+        short=Path(self.temp.name)/'short-audio.mkv'
+        subprocess.run([binary('ffmpeg'),'-y','-v','error','-i',str(self.video),'-filter:a','atrim=duration=3.5','-c:v','copy','-c:a','pcm_s16le','-c:s','copy',str(short)],check=True)
+        await self.setup_separator_fixture(video=short)
+        original=self.app.state.store.asset(self.pid,self.p['assets']['original_audio'])
+        self.assertAlmostEqual(probe(original)['duration'],3.5,places=2)
+        full=await self.submit_separation()
+        self.assertTrue(full['result']['applied'])
+        for name in self.p['separations'][-1]['assets'].values():
+            with wave.open(str(self.app.state.store.asset(self.pid,name))) as audio:
+                self.assertAlmostEqual(audio.getnframes()/audio.getframerate(),4,places=2)
+                audio.setpos(int(3.6*audio.getframerate()))
+                self.assertEqual(set(audio.readframes(100)),{0})
+        await self.submit_separation({'preview':True,'start':3,'end':self.p['media']['duration']})
+        self.assertAlmostEqual(self.p['separations'][-1]['duration'],self.p['media']['duration']-3)
+        await self.submit_separation({'preview':True,'start':3.6,'end':self.p['media']['duration']},expected='failed')
 
     async def test_separation_finishing_after_source_change_is_saved_without_applying(self):
         await self.setup_separator_fixture(delay=.6)
