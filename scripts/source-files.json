@@ -1,5 +1,6 @@
 [
   ".github/repository-metadata.json",
+  ".github/workflows/release.yml",
   ".github/workflows/windows-bootstrap.yml",
   ".gitignore",
   "CHANGELOG.md",

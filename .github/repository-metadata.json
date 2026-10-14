@@ -1,6 +1,6 @@
 {
   "description": "Local AI dubbing studio for Windows + NVIDIA: JP/CN-to-English translation, speaker timelines, reference voices, model adapters, and MKV/MP4 export.",
-  "private": true,
+  "private": false,
   "topics": [
     "dubbing",
     "video-translation",

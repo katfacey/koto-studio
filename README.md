@@ -1,4 +1,4 @@
-# KOTO Studio · 0.2.5
+# KOTO Studio
 
 **A local AI dubbing studio for Windows and NVIDIA GPUs.**
 
@@ -6,11 +6,11 @@ Turn Japanese or Chinese video dialogue into an editable English dub. Import a
 video, separate dialogue from background audio, identify speakers, translate,
 assign voices, review timing, and render—all from a timeline-based editor.
 
-KOTO is in active development and this repository is **private**. Version 0.2.5
-marks the current working baseline, including the recent editing, generation,
+KOTO is in active development. Version 0.2.5 marks the current working baseline, including the recent editing, generation,
 and export improvements.
 
-[Download source ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)
+[Download 0.2.5 alpha ZIP](https://github.com/katfacey/koto-studio/releases/download/v0.2.5/KOTO-Studio-v0.2.5.zip)
+· [Source ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)
 · [Setup guide](docs/SETUP.md)
 · [Changelog](CHANGELOG.md)
 · [Validation](VALIDATION.md)
@@ -203,6 +203,14 @@ The established baseline passed **37 backend tests**, actual Windows Chromium
 editing/playback/export checks, and real Piper/XTTS batch synthesis using app-owned
 runtimes with only Windows System32 on PATH. See [VALIDATION.md](VALIDATION.md) for
 reproducible checks, exact run links, and what still needs target-machine testing.
+
+## Planned improvements
+
+Future releases will focus on improving the GUI, speeding up processing, and adding
+quality-of-life features that are not implemented yet. Planned areas include clearer
+editing/navigation, better generation and queue feedback, more efficient model use,
+and easier project and media management. These are development goals; specific
+features and release dates will depend on testing and feedback.
 
 ## Upstream projects
 

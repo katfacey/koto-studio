@@ -1,6 +1,7 @@
 # Repository About and topics
 
-The repository remains **private**. The intended metadata is recorded in
+The maintainer has requested **public** visibility after publishing the 0.2.5 alpha
+release. The intended metadata is recorded in
 [repository-metadata.json](../.github/repository-metadata.json).
 This is a prepared change: GitHub does not automatically apply this file as
 repository settings. The connected file-writing tools cannot edit About/topics;
@@ -44,11 +45,11 @@ repositories stay out of public topic listings; these choices prepare the About
 section for authorized viewers and any later public release. Similar topics do
 not imply affiliation, endorsement, or that every related project is integrated.
 
-## Apply without changing visibility
+## Apply repository metadata
 
 On the [repository page](https://github.com/katfacey/koto-studio), open the gear
 beside **About**, paste the description, add the topics, and save. Leave visibility
-private. Alternatively, from your own authenticated GitHub CLI:
+unchanged while editing About. Alternatively, from your own authenticated GitHub CLI:
 
 ```powershell
 gh repo edit katfacey/koto-studio --description "Local AI dubbing studio for Windows + NVIDIA: JP/CN-to-English translation, speaker timelines, reference voices, model adapters, and MKV/MP4 export." --add-topic "dubbing,video-translation,ai-translation,subtitle-translation,localization,voice-cloning,text-to-speech,tts,speech-to-text,speech-recognition,speaker-diarization,speech-synthesis,whisper,local-first,pytorch,python,cuda,ollama"
@@ -57,3 +58,10 @@ gh repo edit katfacey/koto-studio --description "Local AI dubbing studio for Win
 This command adds the researched topics and description; it has no visibility
 change flag. GitHub CLI is optional repository maintenance tooling, not a KOTO
 installation dependency. Do not put an access token into project files or chat.
+
+To apply the separately authorized public visibility change, use repository
+Settings → General → Danger Zone → Change repository visibility, or run:
+
+```powershell
+gh repo edit katfacey/koto-studio --visibility public --accept-visibility-change-consequences
+```
