@@ -22,6 +22,15 @@ sample uses labeled illustration and example dialogue; it includes no source
 video. The screenshot shows version 0.2.5 with real Piper takes generated during
 the checks.*
 
+### Advisement:
+
+This is a WiP, and currently made for **my** specific PC specs:
+- Windows 11
+- RTX 5090
+
+IDK if it'll work on other platforms/configurations. Installation is a bit janky right now, as well: run a bunch of `name.cmd`'s and then do **`start.cmd`**.
+I'll work on this as time goes on, implementing a few fixes/changes.
+
 ## What you can do
 
 - **Prepare video and audio.** Inspect MKV/MP4/MOV/WebM tracks, extract audio,
