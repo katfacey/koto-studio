@@ -19,8 +19,8 @@ and export improvements.
 
 *Actual Windows browser screenshot from the validation workflow. The built-in
 sample uses labeled illustration and example dialogue; it includes no source
-video. Real Piper takes are used in the checks. The screenshot may show an earlier
-0.2.x version label; the current release is 0.2.5.*
+video. The screenshot shows version 0.2.5 with real Piper takes generated during
+the checks.*
 
 ## What you can do
 

@@ -1,10 +1,11 @@
 # Validation · KOTO Studio 0.2.5
 
-Version 0.2.5 labels the current baseline. The latest completed behavioral run is
-[Windows validation 38509517679](https://github.com/katfacey/koto-studio/actions/runs/38509517679),
-on the source immediately before the version/documentation update. Its
-[editor screenshot](https://github.com/katfacey/koto-studio/actions/runs/38509517679/artifacts/11869880402)
-is also included in the README. A new version-label run will appear in Actions.
+**[Windows 0.2.5 validation passed](https://github.com/katfacey/koto-studio/actions/runs/38520342988).**
+The run verifies the 0.2.5 health/launcher labels, standalone setup, all 37 backend
+tests, real Piper/XTTS batches, and actual Chromium editing, playback and export.
+Its [editor screenshot](https://github.com/katfacey/koto-studio/actions/runs/38520342988/artifacts/11873252917)
+is included in the README. The final follow-up commit updates documentation and
+the screenshot only; it does not change the runtime code that passed this run.
 
 ## Passed checks
 
