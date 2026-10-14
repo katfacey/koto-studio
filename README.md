@@ -136,7 +136,7 @@ Voices can override those settings per speaker.
 
 | Stage | Included adapter | Installer/setup |
 | --- | --- | --- |
-| Dialogue/background separation | Demucs | `Install-Models.cmd` |
+| Dialogue/background separation | Demucs; MDX-Net, VR, BS-RoFormer via audio-separator | `Install-Models.cmd` / `Install-Separation.cmd` |
 | Speech recognition | faster-whisper | `Install-Models.cmd` |
 | Speaker diarization | pyannote | `Install-Diarization.cmd`; gated model access required |
 | English translation | Local Ollama + Qwen3 | `Install-Translation.cmd` |
@@ -192,6 +192,41 @@ local tools. Native pywebview mode is optional and needs additional setup.
 Project data lives in `data/`; original media and generated assets stay on disk.
 Back up the **whole folder**. Project JSON alone is not a media bundle, and automatic
 cache cleanup and project JSON reimport are not included yet.
+
+## Separation workspace (development branch)
+
+The new separation controls are on `main`; the **0.2.5 alpha ZIP keeps its original
+release contents**. Use Download source (main) to test these additions.
+
+1. Run **Install-Separation.cmd**, then restart KOTO. This installs a dedicated
+   `.workers/separator` environment using app-owned Python,
+   CUDA libraries and ONNX Runtime. Existing Demucs remains available.
+2. Prepare your source, click **Separate**, and choose the engine and model.
+   Download the selected weights explicitly. MDX Inst HQ 3 is about 64 MiB,
+   VR HP Karaoke about 121 MiB, and BS-RoFormer Viperx about 610 MiB.
+3. Choose a source range, use the selected clip's original bounds, or start from
+   the playhead. Preview up to 120 seconds; 30–60 seconds is a useful first test.
+4. Compare **Original / Dialogue / Background** at the same playback position.
+   Check lost speech, dialogue leaking into the bed, music, and effects.
+5. Run **Separate full video** when satisfied. Full results become active when
+   the prepared source still matches. Use **Use in project** to select an older
+   full result. Previews never replace project stems or invalidate an export.
+
+Model controls vary by architecture: MDX overlap/batch/denoise, VR aggression,
+batch/TTA, and RoFormer overlap count/batch. Smaller batches use less memory.
+CUDA errors are surfaced; choose CPU explicitly if needed. Weights stay in
+`runtime/models/separation`, with downloaded-file receipts. Inference uses local
+weights and bundled configuration without fetching model metadata.
+
+Results retain their engine/settings, source identity, range, and audio files in
+project history. Changing the prepared source makes old full results ineligible
+for activation. Switching stems invalidates generated takes that use original
+speaker references. History currently grows until the project is removed;
+ensembles and storage cleanup controls are future work.
+
+The panel is a functional first pass. Backend APIs own model provisioning and
+result history so a future GUI redesign can reuse them; see
+[separation API and architecture](docs/SEPARATION.md).
 
 ## Development and validation
 

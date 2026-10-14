@@ -279,6 +279,24 @@ def main():
                         page.locator(f'.speaker-card[data-id="{second}"]').click()
                         page.evaluate('document.fonts.ready')
                         page.screenshot(path=str(output / 'koto-editor.png'), full_page=True)
+                        # Functional separation controls. Inference is checked separately
+                        # with real weights in the dedicated separation-worker CI job.
+                        page.locator('[data-kind="separate"]').click()
+                        page.locator('.modal-separation').wait_for()
+                        assert page.locator('.modal-separation').get_by_text('Saved results',exact=True).count()==1
+                        page.locator('[data-field="adapter.separation"]').select_option('audio-separator')
+                        page.locator('[data-field="model.separation.model"]').select_option('bs-roformer-viperx')
+                        page.locator('.separation-advanced').wait_for(state='attached')
+                        assert page.locator('.modal-separation').get_by_text('Window overlap count',exact=True).count()==1
+                        page.locator('[data-act="separation-selection"]').click()
+                        bounds=project()['dialogue']
+                        assert float(page.locator('[data-separation-range="end"]').input_value())>float(page.locator('[data-separation-range="start"]').input_value())
+                        assert page.locator('[data-act="separation-preview"]').is_disabled()
+                        assert page.locator('[data-act="separation-full"]').is_disabled()
+                        assert page.locator('[data-act="download-separation-model"]').is_enabled()
+                        page.screenshot(path=str(output / 'koto-separation.png'), full_page=True)
+                        page.locator('[data-act="close-modal"]').click()
+                        page.locator('[data-act="save"]').click()
                         # The queue data below is an explicit UI fixture; no inference is simulated.
                         fixture = [{"id": "ui-fixture", "kind": "prepare", "status": "running", "progress": .5, "message": "UI fixture progress", "result": {}}]
                         page.route('**/api/projects/*/jobs', lambda route: route.fulfill(json=fixture))

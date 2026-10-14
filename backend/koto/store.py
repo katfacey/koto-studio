@@ -62,7 +62,7 @@ class Store:
         pid = str(uuid.uuid4())
         project = {
             "id": pid, "name": name[:120], "revision": 1, "demo": demo,
-            "media": None, "assets": {}, "dialogue": [],
+            "media": None, "assets": {}, "dialogue": [], "separations": [], "active_separation": None,
             "speakers": [{"id": "speaker-1", "name": "Speaker 01", "color": "#8b8aff", "voice": {}, "reference": None, "muted": False, "use_source_reference": False}],
             "models": {
                 "separation": {"id": "demucs", "settings": {"model": "htdemucs", "device": "cuda"}},

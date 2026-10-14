@@ -1,6 +1,6 @@
 param(
     [Alias("Profile")]
-    [ValidateSet("core", "whisper", "audio", "piper", "xtts", "translation", "diarization", "models", "all")]
+    [ValidateSet("core", "whisper", "audio", "piper", "xtts", "translation", "diarization", "separator", "models", "all")]
     [string]$SetupProfile = "core",
     [string]$TranslationModel = ""
 )
@@ -111,18 +111,22 @@ $Receipt | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $RuntimeDir "ins
 
 function Install-StudioWorker([string]$Worker) {
     $WorkerPython = Ensure-StudioEnvironment (Join-Path $StudioRoot ".workers\$Worker")
-    if ($Worker -in @("audio", "xtts", "whisper")) {
+    if ($Worker -in @("audio", "xtts", "whisper", "separator")) {
         # Torch provides app-owned cuBLAS/cuDNN DLLs for CTranslate2 as well.
         Invoke-Checked $UvExe @("--no-config", "pip", "install", "--python", $WorkerPython, "torch==2.7.1", "torchaudio==2.7.1", "--index-url", "https://download.pytorch.org/whl/cu128")
     }
+    if ($Worker -eq "separator") {
+        Invoke-Checked $UvExe @("--no-config", "pip", "install", "--python", $WorkerPython, "torchvision==0.22.1", "--index-url", "https://download.pytorch.org/whl/cu128")
+    }
     switch ($Worker) {
+        "separator" { $Packages = @("audio-separator==0.47.0", "onnxruntime-gpu==1.22.1", "-c", (Join-Path $PSScriptRoot "separator-constraints.txt"), "--override", (Join-Path $PSScriptRoot "separator-overrides.txt")) }
         "whisper" { $Packages = @("faster-whisper>=1.1,<2", "ctranslate2>=4.6,<5") }
         "audio" { $Packages = @("demucs>=4,<5", "pyannote.audio>=3.3,<4", "-c", (Join-Path $PSScriptRoot "torch-constraints.txt")) }
         "piper" { $Packages = @("piper-tts>=1.3,<2") }
         "xtts" { $Packages = @("coqui-tts>=0.27,<0.28", "soundfile", "-c", (Join-Path $PSScriptRoot "torch-constraints.txt")) }
     }
     Invoke-Checked $UvExe (@("--no-config", "pip", "install", "--python", $WorkerPython) + $Packages)
-    if ($Worker -in @("audio", "xtts", "whisper")) { Invoke-Checked $WorkerPython @((Join-Path $PSScriptRoot "check_gpu.py")) }
+    if ($Worker -in @("audio", "xtts", "whisper", "separator")) { Invoke-Checked $WorkerPython @((Join-Path $PSScriptRoot "check_gpu.py")) }
     if ($Worker -eq "xtts") { Invoke-Checked $WorkerPython @((Join-Path $PSScriptRoot "xtts_setup.py")) }
     if ($Worker -eq "piper") {
         $VoiceDir = Join-Path $RuntimeDir "models\piper"
@@ -156,7 +160,7 @@ function Install-StudioTranslation {
 switch ($SetupProfile) {
     "core" { }
     "models" { foreach ($Worker in @("audio","whisper","piper")) { Install-StudioWorker $Worker } }
-    "all" { foreach ($Worker in @("audio","whisper","piper","xtts")) { Install-StudioWorker $Worker }; Install-StudioTranslation }
+    "all" { foreach ($Worker in @("audio","whisper","piper","xtts","separator")) { Install-StudioWorker $Worker }; Install-StudioTranslation }
     "translation" { Install-StudioTranslation }
     "diarization" {
         Install-StudioWorker "audio"

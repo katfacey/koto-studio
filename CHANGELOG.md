@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add an isolated UVR-style separation worker with MDX-Net, VR and BS-RoFormer; keep Demucs.
+- Download and verify model weights explicitly inside the app folder.
+- Preview source ranges and compare original, dialogue and background at matching positions.
+- Save separation history and switch eligible full results without replacing preview/project audio.
+- Keep separation APIs independent of the first-pass panel for a future GUI redesign.
+
 ## 0.2.5
 
 This version names the current development baseline. The changes below were built

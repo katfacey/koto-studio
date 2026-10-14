@@ -1,7 +1,7 @@
 # Model adapter protocol
 
 Built-in workers run outside the backend process in `.workers/audio`,
-`.workers/whisper`, `.workers/piper`, and `.workers/xtts`. The local Ollama adapter
+`.workers/whisper`, `.workers/piper`, `.workers/xtts`, and `.workers/separator`. The local Ollama adapter
 runs its cancellable HTTP client in a separate process and unloads the model
 after each request. Only one processing job runs at a time.
 
@@ -93,3 +93,6 @@ after each finished file. Emit only finished takes, not intermediate files. IDs 
 match the request; missing, duplicate or external artifacts fail validation. Single-line
 requests continue to use `text` and return `audio`. KOTO batches only a speaker's
 compatible takes and retains the original per-line flow for conversion pipelines.
+
+Built-in UVR-style support uses a curated catalog in `models/separation/catalog.json`.
+See [separation architecture and endpoints](../docs/SEPARATION.md) to extend it.

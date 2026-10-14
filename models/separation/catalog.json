@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "metadata_revision": "3826b05b570dbd4fbedbc807758803b35348ba1b",
+  "models": [
+    {
+      "id": "mdx-inst-hq3",
+      "label": "MDX-Net \u00b7 Inst HQ 3",
+      "architecture": "MDX",
+      "filename": "UVR-MDX-NET-Inst_HQ_3.onnx",
+      "size": 66759214,
+      "metadata": "mdx-model-data.json",
+      "description": "Small ONNX model. A quick starting point for comparing dialogue retention and background leakage.",
+      "fields": [
+        {
+          "key": "overlap",
+          "label": "Window overlap",
+          "type": "number",
+          "default": 0.25,
+          "min": 0.01,
+          "max": 0.95,
+          "integer": false
+        },
+        {
+          "key": "batch_size",
+          "label": "Batch size",
+          "type": "number",
+          "default": 1,
+          "min": 1,
+          "max": 16,
+          "integer": true
+        },
+        {
+          "key": "denoise",
+          "label": "Second denoise pass",
+          "type": "checkbox",
+          "default": false
+        }
+      ],
+      "url": "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/UVR-MDX-NET-Inst_HQ_3.onnx",
+      "sha256": null,
+      "source": "https://github.com/Anjok07/ultimatevocalremovergui",
+      "terms": "Model weights have separate terms; review their source before use."
+    },
+    {
+      "id": "vr-hp-karaoke",
+      "label": "VR \u00b7 HP Karaoke",
+      "architecture": "VR",
+      "filename": "5_HP-Karaoke-UVR.pth",
+      "size": 126782699,
+      "metadata": "vr-model-data.json",
+      "description": "Alternative VR architecture. Compare speech clarity and retained effects against MDX and Demucs.",
+      "fields": [
+        {
+          "key": "aggression",
+          "label": "Vocal removal aggression",
+          "type": "number",
+          "default": 5,
+          "min": 0,
+          "max": 100,
+          "integer": true
+        },
+        {
+          "key": "batch_size",
+          "label": "Batch size",
+          "type": "number",
+          "default": 1,
+          "min": 1,
+          "max": 16,
+          "integer": true
+        },
+        {
+          "key": "tta",
+          "label": "Test-time augmentation (slower)",
+          "type": "checkbox",
+          "default": false
+        }
+      ],
+      "url": "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/5_HP-Karaoke-UVR.pth",
+      "sha256": null,
+      "source": "https://github.com/Anjok07/ultimatevocalremovergui",
+      "terms": "Model weights have separate terms; review their source before use."
+    },
+    {
+      "id": "bs-roformer-viperx",
+      "label": "BS-RoFormer \u00b7 Viperx 1297",
+      "architecture": "MDXC",
+      "filename": "model_bs_roformer_ep_317_sdr_12.9755.ckpt",
+      "config": "model_bs_roformer_ep_317_sdr_12.9755.yaml",
+      "size": 639331213,
+      "description": "Larger transformer model. Uses more memory and compute; test a short range before a full episode.",
+      "fields": [
+        {
+          "key": "batch_size",
+          "label": "Batch size",
+          "type": "number",
+          "default": 1,
+          "min": 1,
+          "max": 8,
+          "integer": true
+        },
+        {
+          "key": "overlap",
+          "label": "Window overlap count",
+          "type": "number",
+          "default": 4,
+          "min": 2,
+          "max": 8,
+          "integer": true
+        }
+      ],
+      "url": "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/model_bs_roformer_ep_317_sdr_12.9755.ckpt",
+      "sha256": null,
+      "source": "https://github.com/Anjok07/ultimatevocalremovergui",
+      "terms": "Model weights have separate terms; review their source before use."
+    }
+  ]
+}

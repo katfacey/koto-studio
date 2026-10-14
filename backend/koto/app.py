@@ -18,6 +18,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.concurrency import run_in_threadpool
 
+from .separation import activate, catalog
 from .jobs import Jobs, signature
 from .media import IMAGE_SUBTITLE_CODECS, binary, parse_subtitles, probe
 from .registry import Registry
@@ -217,6 +218,29 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
     async def models():
         return await run_in_threadpool(registry.list)
 
+    @app.get("/api/separation/models")
+    def separation_models():
+        return catalog()
+
+    @app.post("/api/projects/{pid}/separations/{result_id}/activate")
+    def activate_separation(pid:str,result_id:str,body:dict):
+        project(pid)
+        if any(j["status"] in ("queued","running") for j in store.jobs(pid)):
+            raise HTTPException(409,"Wait for active jobs or cancel them before switching separation results")
+        def merge(p):
+            record = next((r for r in p.get("separations",[]) if r["id"] == result_id), None)
+            if record is None:
+                raise KeyError("Separation result not found")
+            if not all(store.asset(pid,record["assets"][key]).is_file() for key in ("vocals","background")):
+                raise ValueError("Saved separation assets are missing")
+            return activate(p,record)
+        try:
+            return store.update(pid,merge,body.get("revision"))
+        except ValueError as error:
+            if str(error).startswith("Project changed"):
+                raise HTTPException(409,str(error))
+            raise
+
     @app.get("/api/projects")
     def list_projects():
         return store.list()
@@ -263,6 +287,7 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
                 for key in ("export","dub_audio","english_subtitles"):
                     p["assets"].pop(key,None)
             if any(p["settings"].get(k)!=previous_settings.get(k) for k in ("audio_stream","video_stream","subtitle_stream")):
+                p["active_separation"] = None
                 for key in ("preview","original_audio","vocals","background"):
                     p["assets"].pop(key,None)
             return p
@@ -288,6 +313,7 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
             raise
         def merge(p):
             p["media"] = {"asset":target.name,"name":Path(file.filename or "Source").name,**metadata}
+            p["active_separation"] = None
             p["assets"] = {}
             p["dialogue"] = []
             p["demo"] = False

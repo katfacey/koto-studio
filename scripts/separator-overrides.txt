@@ -1,0 +1,3 @@
+# Upstream pins samplerate 0.1.0, which predates Windows CPython 3.11 wheels.
+# The 0.2.2 wheel exposes the same resample API without a local C++ build.
+samplerate==0.2.2

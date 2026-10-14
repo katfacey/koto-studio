@@ -41,8 +41,11 @@ def run(request):
     out = Path(request["output_dir"])
     out.mkdir(parents=True, exist_ok=True)
     device = settings.get("device", "cuda")
+    if adapter == "audio-separator":
+        from separation_worker import run as separate
+        return separate(request, progress)
     if adapter == "demucs":
-        cmd = [sys.executable, "-m", "demucs", "--two-stems", "vocals", "-n", settings.get("model", "htdemucs"), "-d", device, "-o", str(out), request["audio"]]
+        cmd = [sys.executable, "-m", "demucs", "--two-stems", "vocals", "-n", settings.get("model", "htdemucs"), "-d", device, "--shifts", str(settings.get("shifts", 1)), "--overlap", str(settings.get("overlap", .25)), "-o", str(out), request["audio"]]
         progress(0.1, "Separating dialogue and accompaniment")
         subprocess.run(cmd, check=True)
         vocals = list(out.rglob("vocals.wav"))

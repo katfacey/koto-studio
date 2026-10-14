@@ -106,7 +106,9 @@ jobs:
         if: always()
         with:
           name: Windows-editor-screenshot
-          path: KOTO Studio/runtime/validation/koto-editor.png
+          path: |
+            KOTO Studio/runtime/validation/koto-editor.png
+            KOTO Studio/runtime/validation/koto-separation.png
 
   reference-voice-worker:
     runs-on: windows-latest
@@ -132,3 +134,35 @@ jobs:
           $env:PATH = "$env:SystemRoot\System32"
           & ".\.venv\Scripts\python.exe" scripts\check_reference_voice.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  separation-worker:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: KOTO Separation Studio
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: KOTO Separation Studio
+      - name: Install app-owned Piper and UVR-style worker with system-only PATH
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile piper
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile separator
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ".\runtime\uv\uv.exe" --no-config pip install --python ".\.venv\Scripts\python.exe" -r backend\requirements-dev.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download models and run real MDX VR and BS-RoFormer preview/full API jobs
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          & ".\.venv\Scripts\python.exe" scripts\check_separation.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Windows-separation-validation
+          path: KOTO Separation Studio/runtime/validation/separation-validation.json

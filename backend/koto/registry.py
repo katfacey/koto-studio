@@ -10,8 +10,10 @@ from pathlib import Path
 
 from .store import ROOT
 from .runtime import ollama_url, runtime_environment
+from .separation import catalog
 
 BUILTINS = [
+    {"id": "audio-separator", "label": "UVR-style · audio-separator", "capability": "separation", "module": "audio_separator", "environment": "separator", "description": "MDX, VR and BS-RoFormer models in an isolated local worker. Run Install-Separation.cmd, then download weights explicitly in Separate audio.", "fields": [{"key":"model","label":"Model","type":"select","options":[m["id"] for m in catalog()["models"]],"default":"mdx-inst-hq3"},{"key":"device","label":"Device","type":"select","options":["cuda","cpu"],"default":"cuda"}]},
     {"id": "demucs", "label": "Demucs · HTDemucs", "capability": "separation", "module": "demucs", "environment": "audio", "description": "Local dialogue / accompaniment separation. Singing-oriented models may lose speech or effects.", "fields": [{"key":"model","label":"Model","type":"text","default":"htdemucs"},{"key":"device","label":"Device","type":"select","options":["cuda","cpu"],"default":"cuda"}]},
     {"id": "faster-whisper", "label": "Faster Whisper", "capability": "transcription", "module": "faster_whisper", "environment": "whisper", "description": "Japanese/Chinese speech recognition with timestamps. Models download on first use unless a local path is supplied.", "fields": [{"key":"model","label":"Model or local path","type":"text","default":"large-v3"},{"key":"language","label":"Source language","type":"select","options":["ja","zh","auto"],"default":"ja"},{"key":"device","label":"Device","type":"select","options":["cuda","cpu"],"default":"cuda"},{"key":"compute_type","label":"Precision","type":"select","options":["float16","int8_float16","int8","float32"],"default":"float16"}]},
     {"id": "pyannote", "label": "Pyannote · local pipeline", "capability": "diarization", "module": "pyannote.audio", "environment": "audio", "description": "Run Install-Diarization.cmd to download weights with your Hugging Face account. Accept both model access agreements first. Blank paths use the app-managed pipeline; inference stays local.", "fields": [{"key":"model","label":"Local pipeline YAML","type":"text","default":"runtime/models/pyannote/pipeline.yaml"},{"key":"device","label":"Device","type":"select","options":["cuda","cpu"],"default":"cuda"}]},
@@ -35,7 +37,7 @@ def interpreter(adapter):
         text = config.read_text(encoding="utf-8-sig").replace("\\", "/").casefold() if config.exists() else ""
         managed = str(ROOT / "runtime" / "python").replace("\\", "/").casefold()
         if managed not in text:
-            installer = {"piper": "Install-Piper.cmd", "xtts": "Install-Reference-Voices.cmd"}.get(env, "Install-Models.cmd")
+            installer = {"piper": "Install-Piper.cmd", "xtts": "Install-Reference-Voices.cmd", "separator": "Install-Separation.cmd"}.get(env, "Install-Models.cmd")
             raise RuntimeError(f"The {env} worker points outside the current app folder, possibly because the app was moved. Close KOTO, run {installer} in this folder to repair it, then restart.")
     return str(path) if path.exists() else sys.executable
 

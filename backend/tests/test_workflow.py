@@ -89,6 +89,88 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r.status_code,200,r.text)
         return await self.wait_job(r.json()["id"])
 
+    async def setup_separator_fixture(self, delay=0):
+        await self.upload("media",self.video)
+        await self.run_job("prepare")
+        script=Path(self.temp.name)/"separator_fixture.py"
+        script.write_text("import json,sys,shutil,time\nfrom pathlib import Path\nr=json.loads(Path(sys.argv[1]).read_text())\ntime.sleep(r['settings'].get('delay',0))\nresult={}\nfor key in ('vocals','background'):\n p=Path(r['output_dir'])/(key+'.wav');shutil.copyfile(r['settings'].get('replacement') or r['audio'],p);result[key]=str(p)\nPath(sys.argv[2]).write_text(json.dumps(result))\n",encoding="utf-8")
+        self.app.state.registry.adapters['separator-fixture']={'id':'separator-fixture','label':'Explicit test-only pass-through separator','capability':'separation','custom':True,'command':[sys.executable,str(script)]}
+        await self.patch(models={**self.p['models'],'separation':{'id':'separator-fixture','settings':{'delay':delay}}})
+
+    async def submit_separation(self,options=None,expected='completed'):
+        response=await self.client.post(f'/api/projects/{self.pid}/jobs',json={'kind':'separate','options':options or {}})
+        self.assertEqual(response.status_code,200,response.text)
+        return await self.wait_job(response.json()['id'],expected)
+
+    async def test_separation_preview_preserves_mix_full_history_switches_and_survives_reopen(self):
+        await self.setup_separator_fixture()
+        first=await self.submit_separation()
+        active=self.p['active_separation']
+        self.assertEqual(active,first['id'])
+        stems={key:self.p['assets'][key] for key in ('vocals','background')}
+        # A preview must preserve every downstream render asset, not just stems.
+        self.app.state.store.update(self.pid,lambda p:{**p,'assets':{**p['assets'],'export':'saved-export.mkv'}})
+        preview=await self.submit_separation({'preview':True,'start':1,'end':2.5})
+        self.assertFalse(preview['result']['applied'])
+        self.assertEqual(self.p['active_separation'],active)
+        self.assertEqual(self.p['assets']['export'],'saved-export.mkv')
+        self.assertEqual({key:self.p['assets'][key] for key in stems},stems)
+        record=self.p['separations'][-1]
+        for asset in record['assets'].values():
+            path=self.app.state.store.asset(self.pid,asset)
+            self.assertAlmostEqual(probe(path)['duration'],1.5,places=2)
+            with wave.open(str(path)) as audio:
+                self.assertEqual((audio.getframerate(),audio.getnchannels(),audio.getsampwidth()),(48000,2,2))
+        rejected=await self.client.post(f'/api/projects/{self.pid}/separations/{preview["id"]}/activate',json={'revision':self.p['revision']})
+        self.assertEqual(rejected.status_code,400)
+        second=await self.submit_separation()
+        self.assertEqual(self.p['active_separation'],second['id'])
+        activated=await self.client.post(f'/api/projects/{self.pid}/separations/{active}/activate',json={'revision':self.p['revision']})
+        self.assertEqual(activated.status_code,200,activated.text)
+        self.p=activated.json()
+        self.assertEqual(self.p['assets']['vocals'],stems['vocals'])
+        stale_revision=await self.client.post(f'/api/projects/{self.pid}/separations/{second["id"]}/activate',json={'revision':self.p['revision']-1})
+        self.assertEqual(stale_revision.status_code,409)
+        reopened=Store(Path(self.temp.name)).get(self.pid)
+        self.assertEqual(len(reopened['separations']),3)
+        self.assertEqual(reopened['active_separation'],active)
+        await self.patch(settings={**self.p['settings'],'audio_stream':None})
+        stale=await self.client.post(f'/api/projects/{self.pid}/separations/{active}/activate',json={'revision':self.p['revision']})
+        self.assertEqual(stale.status_code,400)
+        self.assertIsNone(self.p['active_separation'])
+        self.assertEqual(len(self.p['separations']),3)
+
+    async def test_separation_bounds_bad_output_and_cancel_leave_history_unchanged(self):
+        await self.setup_separator_fixture()
+        for options in ({'preview':True,'start':-1,'end':2},{'preview':True,'start':1,'end':1},{'preview':True,'start':0,'end':5},{'preview':True,'start':True,'end':2},{'start':1}):
+            response=await self.client.post(f'/api/projects/{self.pid}/jobs',json={'kind':'separate','options':options})
+            self.assertEqual(response.status_code,400,response.text)
+        await self.patch(models={**self.p['models'],'separation':{'id':'separator-fixture','settings':{'replacement':str(self.take)}}})
+        failed=await self.submit_separation(expected='failed')
+        self.assertIn('duration differs',failed['message'])
+        self.assertEqual(self.p['separations'],[])
+        await self.patch(models={**self.p['models'],'separation':{'id':'separator-fixture','settings':{'delay':2}}})
+        response=await self.client.post(f'/api/projects/{self.pid}/jobs',json={'kind':'separate'})
+        jid=response.json()['id']
+        await asyncio.sleep(.2)
+        await self.client.post(f'/api/jobs/{jid}/cancel')
+        await self.wait_job(jid,'cancelled')
+        self.assertEqual(self.p['separations'],[])
+        self.assertNotIn('vocals',self.p['assets'])
+
+    async def test_separation_finishing_after_source_change_is_saved_without_applying(self):
+        await self.setup_separator_fixture(delay=.6)
+        response=await self.client.post(f'/api/projects/{self.pid}/jobs',json={'kind':'separate'})
+        jid=response.json()['id']
+        await asyncio.sleep(.15)
+        blocked=await self.client.post(f'/api/projects/{self.pid}/separations/not-found/activate',json={})
+        self.assertEqual(blocked.status_code,409)
+        await self.patch(settings={**self.p['settings'],'audio_stream':None})
+        completed=await self.wait_job(jid)
+        self.assertFalse(completed['result']['applied'])
+        self.assertNotIn('vocals',self.p['assets'])
+        self.assertEqual(len(self.p['separations']),1)
+
     async def test_image_subtitles_are_not_auto_selected_and_prepare_errors_are_immediate(self):
         # Model image-subtitle metadata; media processing itself still uses real FFmpeg.
         metadata = probe(self.video)

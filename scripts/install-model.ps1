@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet("whisper", "audio", "piper", "xtts", "translation", "diarization", "models", "all")]
+    [ValidateSet("whisper", "audio", "piper", "xtts", "translation", "diarization", "separator", "models", "all")]
     [string]$Model,
     [string]$TranslationModel = ""
 )

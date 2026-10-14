@@ -18,6 +18,7 @@ from .runtime import executable, runtime_environment
 from .diarization import require_pipeline
 from .timing import estimate_seconds, playback_rate, adaptation_signature
 from .references import reference_segments, reference_signature, source_bounds
+from .separation import activate, download, installed, model_spec, separation_range, validated_settings
 
 CAPABILITIES = {"separate":"separation", "transcribe":"transcription", "diarize":"diarization", "translate":"translation", "synthesize":"synthesis"}
 
@@ -43,13 +44,26 @@ class Jobs:
         self.thread.start()
 
     def enqueue(self, pid, kind, options=None):
-        if kind not in {*CAPABILITIES, "prepare", "export", "reference", "alternatives"}:
+        if kind not in {*CAPABILITIES, "prepare", "export", "reference", "alternatives", "download_separation_model"}:
             raise ValueError("Unknown job type")
         project = self.store.get(pid)
         if kind=="synthesize" and (options or {}).get("speaker_id") and not any(s["id"]==(options or {})["speaker_id"] for s in project["speakers"]):
             raise ValueError("Unknown speaker for synthesis")
         if not project["media"] and kind in ("prepare","separate","transcribe","diarize","export"):
             raise ValueError("Import source media first")
+        if kind == "download_separation_model":
+            model_spec((options or {}).get("model_id"))
+        if kind == "separate":
+            separation_range(project, options or {})
+            selection = project["models"]["separation"]
+            adapter = self.registry.get(selection["id"], "separation")
+            interpreter(adapter)
+            if not adapter.get("custom") and not module_available(adapter):
+                raise ValueError("Install the separation worker first: " + ("Install-Separation.cmd" if adapter["id"] == "audio-separator" else "Install-Models.cmd"))
+            if adapter["id"] == "audio-separator":
+                selection["settings"] = validated_settings(selection.get("settings", {}))
+                if not installed(model_spec(selection["settings"]["model"])):
+                    raise ValueError("Download the selected model in Separate audio first")
         if kind == "prepare":
             settings = project["settings"]
             if all(settings.get(key) is None for key in ("video_stream", "audio_stream", "subtitle_stream")):
@@ -276,6 +290,7 @@ class Jobs:
             assets["source_subtitles"] = path.name
         def merge(p):
             # Re-preparation clears downstream stems; original media remains immutable.
+            p["active_separation"] = None
             for key in ("vocals","background"):
                 p["assets"].pop(key,None)
             p["assets"].update(assets)
@@ -328,18 +343,46 @@ class Jobs:
         speaker = next(s for s in project["speakers"] if s["id"] == options["speaker_id"])
         return self.source_reference(jid, project, speaker)
 
+    def download_separation_model(self, jid, project, options):
+        return download(options["model_id"], lambda value, message: self.progress(jid, value, message), lambda: self.check(jid))
+
     def separate(self, jid, project, options):
-        original = project["assets"].get("original_audio")
-        if not original:
-            raise ValueError("Run Prepare media first")
-        result = self.worker(jid,project,"separation",{"audio":str(self.store.asset(project["id"],original))})
+        preview, start, end = separation_range(project, options)
+        original = project["assets"]["original_audio"]
         root = self.store.project_dir(project["id"])
-        assets = {k:str(Path(result[k]).relative_to(root)) for k in ("vocals","background")}
+        source = self.store.asset(project["id"], original)
+        comparison = original
+        if preview:
+            clipped = root / f"{jid}_comparison.wav"
+            self.ffmpeg(jid,root,"-ss",str(start),"-i",source,"-t",str(end-start),"-ar","48000","-ac","2","-c:a","pcm_s16le",clipped)
+            source, comparison = clipped, clipped.name
+        self.progress(jid,.05,"Separating preview range" if preview else "Separating full source")
+        result = self.worker(jid,project,"separation",{"audio":str(source)},base=.05,span=.8)
+        assets = {"original":comparison}
+        for key in ("vocals","background"):
+            if key not in result:
+                raise ValueError("Separation worker returned no " + key)
+            raw = Path(result[key])
+            actual = probe(raw)["duration"]
+            if not actual > 0 or abs(actual-(end-start)) > .25:
+                raise ValueError(f"{key} duration differs from the source. The result was not applied.")
+            # Maintain the same timeline and PCM format for every model. Only
+            # rounding/padding at the tail is allowed; speech is never sped up.
+            path = root / f"{jid}_{key}.wav"
+            self.ffmpeg(jid,root,"-i",raw,"-af",f"apad,atrim=duration={end-start}","-ar","48000","-ac","2","-c:a","pcm_s16le",path)
+            assets[key] = path.name
+        selection = project["models"]["separation"]
+        record = {"id":jid,"created":time.time(),"source_asset":original,"preview":preview,"start":start,"end":end,"duration":end-start,"selection":selection,"label":self.registry.get(selection["id"])["label"],"assets":assets}
+        applied = False
         def merge(p):
-            p["assets"].update(assets)
+            nonlocal applied
+            p.setdefault("separations",[]).append(record)
+            if not preview and p["assets"].get("original_audio") == original:
+                activate(p,record)
+                applied = True
             return p
-        self.commit(jid,project["id"],merge)
-        return {"assets":assets}
+        self.commit(jid,project["id"],merge,preserve_exports=True)
+        return {"separation_id":jid,"preview":preview,"applied":applied,"assets":assets}
 
     def transcribe(self, jid, project, options):
         result = self.worker(jid,project,"transcription",{"audio":self.audio_source(project)})
