@@ -18,7 +18,10 @@ def resolve_voice(project, line):
     voice, clip = ({} if line.get('voice_profile') else speaker.get('voice', {})), line.get('voice', {})
     adapter = clip.get('adapter') or voice.get('adapter') or profile.get('adapter') or project['models']['synthesis']['id']
     default = project['models']['synthesis']
-    settings = dict(default.get('settings', {})) if adapter == default['id'] else {}
+    from .registry import BUILTINS
+    builtin=next((a for a in BUILTINS if a['id']==adapter),{})
+    settings={f['key']:f['default'] for f in builtin.get('fields',[])}
+    if adapter==default['id']: settings.update(default.get('settings',{}))
     for config in (profile, voice, clip):
         if not config.get('adapter') or config['adapter'] == adapter:
             settings.update(config.get('settings', {}))
@@ -42,7 +45,7 @@ def resolve_voice(project, line):
 
 def signature(project, line):
     speaker = next((s for s in project['speakers'] if s['id'] == line['speaker']), {})
-    if not line.get('voice') and not line.get('voice_profile') and not speaker.get('voice_profile'):
+    if not line.get('voice') and not line.get('voice_profile') and not speaker.get('voice_profile') and not speaker.get('reference_text'):
         # Existing project takes keep their original fingerprint until new features are used.
         reference = ['source', reference_signature(project, line['speaker'])] if speaker.get('use_source_reference', False) else speaker.get('reference')
         content = [line.get('translation', ''), line['speaker'], speaker.get('voice', {}), reference, project['models'].get('synthesis'), project['models'].get('voice_conversion')]

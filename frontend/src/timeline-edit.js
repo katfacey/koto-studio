@@ -12,7 +12,7 @@ export function moveClip(p,id,target,start){
   const limit=p.media?.duration??Math.max(18,...p.dialogue.map(l=>l.end+3));
   const next=Number.isFinite(start)?Math.max(0,Math.min(limit-length,start)):line.start;
   if(line.speaker===target&&Math.abs(next-line.start)<.0005)return false;
-  if(line.speaker!==target&&line.audio?.kind==='generated'){
+  if(line.speaker!==target&&line.audio?.kind==='generated'&&!(line.voice_profile&&line.voice?.reference_mode!=='source')){
     line.audio=null;line.warning='Speaker changed. Regenerate this voice take.';
   }
   preserveSource(line);

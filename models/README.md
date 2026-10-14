@@ -96,3 +96,8 @@ compatible takes and retains the original per-line flow for conversion pipelines
 
 Built-in UVR-style support uses a curated catalog in `models/separation/catalog.json`.
 See [separation architecture and endpoints](../docs/SEPARATION.md) to extend it.
+
+Synthesis batches may carry per-line `seed`, `delivery`, and `target_seconds`;
+shared requests include `reference_text`. Declare `supports_seed` and/or
+`supports_delivery` when the worker consumes these controls. Qwen cloning uses
+one prepared reference prompt per compatible batch. See [reusable voices](../docs/VOICES.md).

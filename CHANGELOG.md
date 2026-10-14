@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add reusable, versioned character voice profiles with project-owned snapshots and samples.
+- Preserve generated/imported take history and allow explicit selection of older takes.
+- Add independent clip voice/reference/seed and supported delivery overrides.
+- Batch compatible voices while retaining per-line settings.
+- Add isolated local Qwen3-TTS Base cloning and VoiceDesign audition workers.
+- Document DramaBox feasibility and remaining Windows/GPU validation before integration.
+
 - Add an isolated UVR-style separation worker with MDX-Net, VR and BS-RoFormer; keep Demucs.
 - Download and verify model weights explicitly inside the app folder.
 - Preview source ranges and compare original, dialogue and background at matching positions.

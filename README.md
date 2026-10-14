@@ -231,6 +231,24 @@ The panel is a functional first pass. Backend APIs own model provisioning and
 result history so a future GUI redesign can reuse them; see
 [separation API and architecture](docs/SEPARATION.md).
 
+## Reusable character voices (development branch)
+
+Save speaker voices to a shared library, assign them in other projects, and keep
+specific profile versions pinned. The clip inspector adds independent engine,
+reference, seed and supported delivery overrides, plus saved-take selection.
+Changing wording or voice settings retains older generated/imported takes.
+
+Run **Install-Qwen-Voices.cmd** for local reference cloning, or
+**Install-Voice-Design.cmd** to add description-based voice auditions. Save a
+chosen audition as a reference voice to maintain its identity across many lines.
+Workers and versioned model snapshots stay inside the app folder. The later GUI
+redesign can reuse the same library APIs.
+
+See [voice setup, storage and API](docs/VOICES.md). DramaBox has been evaluated as
+an expressive future engine; it is not presented as a working built-in adapter
+without Windows/5090 validation. These additions are on `main`, not in the
+unchanged 0.2.5 release ZIP.
+
 ## Development and validation
 
 The backend uses Python/FastAPI, SQLite projects, FFmpeg media processing, and

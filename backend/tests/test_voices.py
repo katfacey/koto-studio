@@ -44,4 +44,8 @@ class VoiceTests(unittest.TestCase):
             self.assertNotIn('speaker_id',resolved['settings'])
             frozen=copy.deepcopy(line['voice_profile']);sp['voice_profile']['config']['settings']['device']='cuda'
             self.assertEqual(line['voice_profile'],frozen)
+            cloned=signature(p,line);line['speaker']=p['speakers'][1]['id']
+            self.assertEqual(signature(p,line),cloned)
+            line['voice']={'adapter':'piper'}
+            self.assertTrue(resolve_voice(p,line)['settings']['model'].endswith('.onnx'))
             with self.assertRaises(ValueError):validate_voice({'seed':True},Registry())

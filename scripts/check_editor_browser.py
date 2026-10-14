@@ -306,8 +306,9 @@ def main():
                         page.locator('.voice-library-row').filter(has_text='Recurring test character').wait_for(timeout=60000)
                         profile=page.request.get(url+'/api/voices').json()[0]
                         page.locator(f'[data-act="assign-library-voice"][data-id="{profile["id"]}"]').click()
+                        page.locator('.voice-library-row').filter(has_text='This project uses v1').wait_for()
                         page.locator('[data-act="close-modal"]').click()
-                        assert project()['speakers'][1]['voice_profile']['version']==1
+                        assert next(s for s in project()['speakers'] if s['id']==second)['voice_profile']['version']==1
                         page.locator('[data-act="timeline-tab"]').click()
                         page.locator('[data-field="clip.reference_text"]').fill('Clip-only override')
                         save()
@@ -322,7 +323,7 @@ def main():
                         page.locator('[data-act="voice-library"]').click()
                         page.locator('[data-act="revise-library-voice"]').click()
                         page.locator('.voice-library-row').filter(has_text='Recurring test character').filter(has_text='Version 2').wait_for(timeout=60000)
-                        assert project()['speakers'][1]['voice_profile']['version']==1
+                        assert next(s for s in project()['speakers'] if s['id']==second)['voice_profile']['version']==1
                         page.screenshot(path=str(output/'koto-voice-library.png'),full_page=True)
                         page.locator('[data-act="close-modal"]').click()
                         # The queue data below is an explicit UI fixture; no inference is simulated.
