@@ -265,7 +265,7 @@ def main():
                         unchanged=page.request.get(f'{url}/api/projects/{warning_pid}').json()['dialogue'][0]
                         assert unchanged['start']==1.5 and unchanged['end']==1.6
                         download=page.locator('.job-row.job-completed a[download]')
-                        assert page.request.get(download.get_attribute('href')).ok
+                        assert page.request.get(url+download.get_attribute('href')).ok
                         # Return to the labeled sample for the editor screenshot and remaining queue check.
                         page.evaluate('(pid)=>localStorage.setItem("koto-project",pid)',pid)
                         page.reload(wait_until='networkidle')
