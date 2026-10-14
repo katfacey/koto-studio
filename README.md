@@ -30,6 +30,7 @@ This is a WiP, and currently made for **my** specific PC specs:
 
 IDK if it'll work on other platforms/configurations. Installation is a bit janky right now, as well: run a bunch of `name.cmd`'s and then do **`start.cmd`**.
 I'll work on this as time goes on, implementing a few fixes/changes.
+The current state is more of a *proof of concept* rather than a true-blue piece of software. However, it did function on a technical level, so it can only get better from here.
 
 ## What you can do
 
