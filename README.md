@@ -6,7 +6,7 @@ model environments, and optional local translation runtime inside the app folder
 
 **[Download the complete ZIP](https://github.com/katfacey/koto-studio/archive/refs/heads/main.zip)**
 
-[Windows validation passed](https://github.com/katfacey/koto-studio/actions/runs/38503889989): 35 backend tests, real Piper/XTTS speaker batches, moved-folder worker repair, and Chromium export timing preflight/fixes, autosave, trim, delete/undo, generation and playback checks with only Windows System32 on PATH.
+[Windows validation passed](https://github.com/katfacey/koto-studio/actions/runs/38509517679): 37 backend tests, real Piper/XTTS speaker batches, moved-folder worker repair, and Chromium export timing warnings, Render anyway, full audio tails, autosave, trim, delete/undo, generation and playback checks with only Windows System32 on PATH.
 
 ## Standalone installation
 
@@ -327,4 +327,4 @@ overlap; dedicated forced alignment and automatic translation repair loops remai
 later work. Custom model adapters, including RVC/UVR bridges, use the protocol in
 [models/README.md](models/README.md).
 
-The latest actual Windows editor screenshot is available in the [validation artifact](https://github.com/katfacey/koto-studio/actions/runs/38503889989/artifacts/11867235881). It uses the labeled sample project and real Piper takes; GPU voice similarity must be evaluated on the target PC.
+The latest actual Windows editor screenshot is available in the [validation artifact](https://github.com/katfacey/koto-studio/actions/runs/38509517679/artifacts/11869880402). It uses the labeled sample project and real Piper takes; GPU voice similarity must be evaluated on the target PC.
