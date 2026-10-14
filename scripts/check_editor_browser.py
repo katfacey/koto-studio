@@ -258,7 +258,7 @@ def main():
                         render.click()
                         page.locator('.job-row.job-completed').wait_for(timeout=60000)
                         assert 'timing warnings' in page.locator('.job-row.job-completed').inner_text()
-                        assert page.locator('.job-warnings').count()==1
+                        assert page.locator('.job-row.job-completed .job-warnings').count()==1
                         completed=page.request.get(f'{url}/api/projects/{warning_pid}/jobs').json()[0]
                         assert completed['status']=='completed' and completed['result']['warnings']
                         assert completed['result']['duration']>=3.5
