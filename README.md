@@ -214,3 +214,9 @@ separately; official [XTTS-v2 weights](https://huggingface.co/coqui/XTTS-v2) use
 Coqui Public Model License. Review the relevant upstream terms when choosing a model.
 
 [Prepared repository description and researched topics](docs/REPOSITORY.md)
+
+## Development credit
+
+KOTO Studio was developed with assistance from OpenAI’s ChatGPT/Codex, including
+implementation, debugging, test development, and documentation, guided by the
+project creator’s requirements and feedback.
