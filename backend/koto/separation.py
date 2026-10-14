@@ -170,6 +170,9 @@ def activate(project, result):
         if speaker.get('use_source_reference'):
             for line in project['dialogue']:
                 if line['speaker'] == speaker['id'] and (line.get('audio') or {}).get('kind') == 'generated':
+                    from .voices import remember_take, resolve_voice
+                    if not resolve_voice(project,line)['source']: continue
+                    remember_take(project,line)
                     line['audio'] = None
                     line['warning'] = 'Original voice reference changed. Regenerate this line.'
     return project

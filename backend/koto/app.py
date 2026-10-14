@@ -19,6 +19,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.concurrency import run_in_threadpool
 
 from .separation import activate, catalog
+from .voices import current_take, remember_take, resolve_voice, validate_voice
 from .jobs import Jobs, signature
 from .media import IMAGE_SUBTITLE_CODECS, binary, parse_subtitles, probe
 from .registry import Registry
@@ -77,6 +78,7 @@ def validate_project(p, registry):
         if not re.fullmatch(r"#[0-9a-fA-F]{6}",s.get("color","")):
             raise ValueError("Invalid speaker color")
         voice = s.get("voice",{})
+        validate_voice(voice,registry)
         if voice.get("adapter"):
             registry.get(voice["adapter"],"synthesis")
         if voice.get("conversion"):
@@ -96,6 +98,7 @@ def validate_project(p, registry):
         if "source_start" in line or "source_end" in line:
             line["source_start"] = number(line.get("source_start"),0,max_duration,"Original start time")
             line["source_end"] = number(line.get("source_end"),line["source_start"]+.02,max_duration+.001,"Original end time")
+        validate_voice(line.get("voice",{}),registry)
         if line.get("speaker") not in speaker_ids:
             raise ValueError("Dialogue refers to an unknown speaker")
         for key in ("source","translation","subtitle"):
@@ -266,21 +269,29 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
             previous_settings = dict(p["settings"])
             previous_export = {k:p[k] for k in ("dialogue","speakers","models","settings")}
             old = {l["id"]:l for l in p["dialogue"]}
+            old_speakers = {s["id"]:s for s in p["speakers"]}
+            for prior in p["dialogue"]: remember_take(p,prior)
             p.update(changes)
             validate_project(p,registry)
             # UI cannot invent file paths or attach another project's audio.
             for s in p["speakers"]:
+                if s.get("voice_profile") != old_speakers.get(s["id"],{}).get("voice_profile"):
+                    raise ValueError("Use the voice assignment endpoint to change a library binding")
                 if s.get("reference") and not store.asset(pid,s["reference"]).is_file():
                     raise ValueError("Speaker reference does not exist")
                 if s.get("source_reference") and not store.asset(pid,s["source_reference"]["asset"]).is_file():
                     raise ValueError("Original voice reference does not exist")
             for line in p["dialogue"]:
                 prior = old.get(line["id"])
+                if line.get("voice_profile") != (prior or {}).get("voice_profile"):
+                    raise ValueError("Use the voice assignment endpoint to change a clip library binding")
+                if line.get("voice",{}).get("reference") and not store.asset(pid,line["voice"]["reference"]).is_file():
+                    raise ValueError("Clip reference does not exist")
                 if line.get("audio") and (not prior or prior.get("audio")!=line["audio"]):
                     path = store.asset(pid,line["audio"]["asset"])
                     if not path.is_file() or path.suffix.lower() not in (".wav",".mp3",".flac",".m4a",".ogg"):
                         raise ValueError("Use the audio upload endpoint to attach a voice take")
-                if line.get("audio") and line["audio"].get("kind")=="generated" and line["audio"].get("signature")!=signature(p,line):
+                if line.get("audio") and not current_take(p,line):
                     line["audio"] = None
                     line["warning"] = "Text or voice changed. Regenerate this line."
             # Choosing a model for a prospective separation preview does not
@@ -398,12 +409,114 @@ def create_app(data_dir: Path = DATA, dist_dir: Path | None = None):
         metadata = await run_in_threadpool(probe,path)
         def merge(p):
             line = next(l for l in p["dialogue"] if l["id"]==lid)
+            remember_take(p,line)
             line["audio"] = {"asset":path.name,"duration":metadata["duration"],"kind":"imported"}
             for key in ("export","dub_audio","english_subtitles"):
                 p["assets"].pop(key,None)
+            remember_take(p,line)
             line["warning"] = "Imported take exceeds slot; adjust timing or replace it" if metadata["duration"]>(line["end"]-line["start"])*1.25 else ""
             return p
         return store.update(pid,merge)
+
+    @app.get('/api/voices')
+    def list_voices():
+        return jobs.voices.list()
+
+    @app.get('/api/voices/{voice_id}')
+    def get_voice(voice_id:str,version:int|None=None):
+        return jobs.voices.get(voice_id,version)
+
+    @app.get('/api/voices/{voice_id}/versions/{version}/assets/{name:path}')
+    def voice_sample(voice_id:str,version:int,name:str):
+        jobs.voices.get(voice_id,version)
+        path=jobs.voices.asset(voice_id,version,name)
+        if not path.is_file():raise KeyError('Voice sample not found')
+        return FileResponse(path)
+
+    @app.post('/api/voices/{voice_id}/archive')
+    def archive_voice(voice_id:str,body:dict):
+        jobs.voices.get(voice_id)
+        archived=body.get('archived',True)
+        if not isinstance(archived,bool):raise ValueError('Archived must be true or false')
+        with store.connect() as db:db.execute('UPDATE voice_profiles SET archived=? WHERE id=?',(int(archived),voice_id))
+        return {'ok':True}
+
+    def change_voice(pid,entity_id,body,clip=False):
+        project(pid)
+        if any(j['status'] in ('queued','running') for j in store.jobs(pid)):
+            raise HTTPException(409,'Wait for active jobs or cancel them before assigning a voice')
+        binding=jobs.voices.bind(pid,body['profile_id'],body.get('version')) if body.get('profile_id') else None
+        def merge(p):
+            entity=next((e for e in p['dialogue' if clip else 'speakers'] if e['id']==entity_id),None)
+            if not entity:raise KeyError('Clip or speaker not found')
+            entity['voice_profile']=binding
+            if not clip:entity['voice']={}
+            if not clip:
+                entity['reference']=binding.get('reference') if binding else None
+                entity['reference_text']=binding['config'].get('reference_text','') if binding else ''
+                entity['use_source_reference']=False
+            for line in p['dialogue']:
+                if line.get('audio') and not current_take(p,line):
+                    remember_take(p,line);line['audio']=None;line['warning']='Voice assignment changed. Generate a new take or select a saved take.'
+            for key in ('export','dub_audio','english_subtitles'):p['assets'].pop(key,None)
+            return p
+        try:return store.update(pid,merge,body.get('revision'))
+        except ValueError as error:
+            if str(error).startswith('Project changed'):raise HTTPException(409,str(error))
+            raise
+
+    @app.post('/api/projects/{pid}/speakers/{sid}/voice-profile')
+    def assign_speaker_voice(pid:str,sid:str,body:dict):
+        return change_voice(pid,sid,body)
+
+    @app.post('/api/projects/{pid}/dialogue/{lid}/voice-profile')
+    def assign_clip_voice(pid:str,lid:str,body:dict):
+        return change_voice(pid,lid,body,True)
+
+    @app.post('/api/projects/{pid}/dialogue/{lid}/reference')
+    async def clip_reference(pid:str,lid:str,file:UploadFile=File(...)):
+        p=project(pid)
+        if not any(l['id']==lid for l in p['dialogue']):raise KeyError('Clip not found')
+        path=await upload(pid,file,{'.wav','.mp3','.flac','.m4a','.ogg'})
+        metadata=await run_in_threadpool(probe,path)
+        if not 3 <= metadata['duration'] <= 120:raise ValueError('Reference audio must be 3–120 seconds')
+        def merge(p):
+            line=next(l for l in p['dialogue'] if l['id']==lid)
+            remember_take(p,line)
+            line.setdefault('voice',{}).update(reference_mode='sample',reference=path.name,reference_text='')
+            if line.get('audio') and not current_take(p,line):line['audio']=None
+            for key in ('export','dub_audio','english_subtitles'):p['assets'].pop(key,None)
+            return p
+        return store.update(pid,merge)
+
+    @app.get('/api/projects/{pid}/dialogue/{lid}/takes')
+    def get_takes(pid:str,lid:str):
+        p=project(pid)
+        line=next((l for l in p['dialogue'] if l['id']==lid),None)
+        if not line:raise KeyError('Clip not found')
+        remember_take(p,line)
+        return p.get('takes',{}).get(lid,[])
+
+    @app.post('/api/projects/{pid}/dialogue/{lid}/takes/{take_id}/select')
+    def select_take(pid:str,lid:str,take_id:str,body:dict):
+        project(pid)
+        def merge(p):
+            line=next((l for l in p['dialogue'] if l['id']==lid),None)
+            if not line:raise KeyError('Clip not found')
+            remember_take(p,line)
+            take=next((t for t in p.get('takes',{}).get(lid,[]) if t['id']==take_id),None)
+            if not take:raise KeyError('Take not found')
+            if not store.asset(pid,take['audio']['asset']).is_file():raise ValueError('Saved take audio is missing')
+            line['audio']=json.loads(json.dumps(take['audio']))
+            different=not current_take(p,line)
+            line['audio']['accepted_signature']=signature(p,line)
+            line['warning']='Saved take selected for changed text/voice. Listen before exporting.' if different else ''
+            for key in ('export','dub_audio','english_subtitles'):p['assets'].pop(key,None)
+            return p
+        try:return store.update(pid,merge,body.get('revision'))
+        except ValueError as error:
+            if str(error).startswith('Project changed'):raise HTTPException(409,str(error))
+            raise
 
     @app.get("/api/projects/{pid}/assets/{asset:path}")
     def get_asset(pid:str,asset:str):

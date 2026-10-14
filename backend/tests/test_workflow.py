@@ -555,6 +555,51 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.p['dialogue'][2]['audio']['kind'],'imported')
         self.assertEqual(self.p['dialogue'][1]['audio']['asset'],other)
 
+    async def test_voice_library_reuse_versions_clip_overrides_and_saved_takes(self):
+        calls,_=await self.configure_batch_fixture()
+        response=await self.client.post(f'/api/projects/{self.pid}/jobs',json={'kind':'save_voice','options':{'speaker_id':'speaker-1','name':'Recurring character'}})
+        saved=await self.wait_job(response.json()['id'])
+        profile=saved['result']['voice_profile']
+        assign=await self.client.post(f'/api/projects/{self.pid}/speakers/speaker-1/voice-profile',json={'revision':self.p['revision'],'profile_id':profile['id']})
+        self.assertEqual(assign.status_code,200,assign.text);self.p=assign.json()
+        self.assertEqual(self.p['speakers'][0]['voice_profile']['version'],1)
+        await self.run_job('synthesize')
+        first=self.p['dialogue'][0]['audio']['asset']
+        self.assertEqual(len(self.p['takes']['first']),1)
+        self.p['dialogue'][0]['voice']={'settings':{'marker':'one-clip-only'}}
+        await self.patch(dialogue=self.p['dialogue'])
+        self.assertIsNone(self.p['dialogue'][0]['audio'])
+        self.assertIsNotNone(self.p['dialogue'][1]['audio'])
+        self.assertEqual(self.p['takes']['first'][0]['audio']['asset'],first)
+        generated=await self.run_job('synthesize');self.assertEqual(generated['result']['lines'],1)
+        self.assertEqual(len(self.p['takes']['first']),2)
+        take=self.p['takes']['first'][0]
+        selected=await self.client.post(f'/api/projects/{self.pid}/dialogue/first/takes/{take["id"]}/select',json={'revision':self.p['revision']})
+        self.assertEqual(selected.status_code,200,selected.text);self.p=selected.json()
+        self.assertEqual(self.p['dialogue'][0]['audio']['asset'],first)
+        self.assertIn('changed text/voice',self.p['dialogue'][0]['warning'])
+        await self.patch(settings={**self.p['settings'],'background_mode':'silence'})
+        await self.run_job('export')
+        # A library update does not change a project until it explicitly adopts it.
+        response=await self.client.post(f'/api/projects/{self.pid}/jobs',json={'kind':'save_voice','options':{'speaker_id':'speaker-1','name':'Recurring character','profile_id':profile['id'],'expected_version':1}})
+        revised=await self.wait_job(response.json()['id'])
+        self.assertEqual(revised['result']['voice_profile']['version'],2)
+        self.assertEqual(self.p['speakers'][0]['voice_profile']['version'],1)
+        another=(await self.client.post('/api/projects',json={'name':'Project B'})).json()
+        bound=await self.client.post(f'/api/projects/{another["id"]}/speakers/speaker-1/voice-profile',json={'revision':another['revision'],'profile_id':profile['id']})
+        self.assertEqual(bound.status_code,200,bound.text)
+        snapshot=bound.json()['speakers'][0]['voice_profile']
+        self.assertEqual(snapshot['version'],2)
+        self.assertTrue(self.app.state.store.asset(another['id'],snapshot['reference']).is_file())
+        # Preserve timing and local settings when assigning a clip voice.
+        self.p['dialogue'][1]['voice']={'seed':None};self.p['dialogue'][1]['gain']=.5
+        await self.patch(dialogue=self.p['dialogue'])
+        result=await self.client.post(f'/api/projects/{self.pid}/dialogue/second/voice-profile',json={'revision':self.p['revision'],'profile_id':profile['id'],'version':1})
+        self.assertEqual(result.status_code,200,result.text)
+        clip=result.json()['dialogue'][1]
+        self.assertEqual(clip['voice'],{'seed':None});self.assertEqual(clip['gain'],.5)
+        self.assertEqual(clip['voice_profile']['version'],1)
+
     async def test_batch_rejects_artifacts_outside_the_worker_directory(self):
         calls,_=await self.configure_batch_fixture()
         script=Path(self.temp.name)/'bad-batch.py'

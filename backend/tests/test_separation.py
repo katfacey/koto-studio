@@ -51,7 +51,7 @@ class ProvisionTests(unittest.TestCase):
                 separation.validated_settings({'model':'mdx-inst-hq3',**values})
 
     def test_activating_full_stems_invalidates_only_original_reference_generated_takes(self):
-        p={'assets':{'original_audio':'source.wav','export':'old.mkv'},'speakers':[{'id':'original','use_source_reference':True,'source_reference':{'asset':'ref.wav'}},{'id':'sample','use_source_reference':False}], 'dialogue':[{'id':'a','speaker':'original','audio':{'kind':'generated'}},{'id':'b','speaker':'original','audio':{'kind':'imported'}},{'id':'c','speaker':'sample','audio':{'kind':'generated'}}]}
+        p={'models':{'synthesis':{'id':'piper','settings':{}}},'assets':{'original_audio':'source.wav','export':'old.mkv'},'speakers':[{'id':'original','use_source_reference':True,'source_reference':{'asset':'ref.wav'}},{'id':'sample','use_source_reference':False}], 'dialogue':[{'id':'a','speaker':'original','audio':{'kind':'generated'}},{'id':'b','speaker':'original','audio':{'kind':'imported'}},{'id':'c','speaker':'sample','audio':{'kind':'generated'}}]}
         result={'id':'full','preview':False,'source_asset':'source.wav','assets':{'vocals':'vocals.wav','background':'background.wav'}}
         separation.activate(p,result)
         self.assertNotIn('export',p['assets'])

@@ -167,3 +167,28 @@ jobs:
         with:
           name: Windows-separation-validation
           path: KOTO Separation Studio/runtime/validation/separation-validation.json
+
+  qwen-voice-worker:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: KOTO Qwen Studio
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: KOTO Qwen Studio
+      - name: Install private Qwen Base VoiceDesign and Piper workers
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile piper
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Profile qwen-design
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run actual reference batch design audition and design-then-clone
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          & ".\.venv\Scripts\python.exe" scripts\check_qwen.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

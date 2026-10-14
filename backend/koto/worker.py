@@ -22,14 +22,14 @@ def progress(value, message):
 def synthesize_lines(request, out, render):
     lines = request.get("lines")
     if lines is None:
-        path=out/"speech.wav";render(request["text"],path);return {"audio":str(path)}
+        path=out/"speech.wav";render(request["text"],path,request);return {"audio":str(path)}
     if not isinstance(lines,list) or not lines:
         raise ValueError("A synthesis batch needs dialogue lines")
     takes=[]
     for index,line in enumerate(lines):
         progress(.15+.8*index/len(lines),f"Synthesizing line {index+1} of {len(lines)} with the loaded voice")
         path=out/f"speech_{index}.wav"
-        render(line["text"],path)
+        render(line["text"],path,line)
         take={"id":line["id"],"audio":str(path)};takes.append(take)
         print("KOTO_EVENT "+json.dumps({"completed_take":take}),flush=True)
     return {"takes":takes}
@@ -90,6 +90,9 @@ def run(request):
         annotation = getattr(result, "speaker_diarization", result)
         turns = [{"start": turn.start, "end": turn.end, "speaker": speaker} for turn, _, speaker in annotation.itertracks(yield_label=True)]
         return {"turns": turns}
+    if adapter in ("qwen","qwen-design"):
+        from qwen_worker import run as qwen_run
+        return qwen_run(request,progress,synthesize_lines)
     if adapter == "piper":
         from piper import PiperVoice
         import wave
@@ -99,12 +102,11 @@ def run(request):
         voice = PiperVoice.load(str(model_path))
         from piper.config import SynthesisConfig
         config=SynthesisConfig(speaker_id=int(settings.get("speaker_id",0)))
-        def render(text,path):
+        def render(text,path,options=None):
             with wave.open(str(path),"wb") as f:
                 voice.synthesize_wav(text,f,syn_config=config)
         return synthesize_lines(request,out,render)
     if adapter == "xtts":
-        import os
         # Official XTTS checkpoints contain config classes predating Torch 2.6.
         os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
         import torch
@@ -124,7 +126,8 @@ def run(request):
         model.load_checkpoint(config, checkpoint_dir=str(directory), eval=True)
         model.to(torch.device(device))
         conditioning, embedding = model.get_conditioning_latents(audio_path=[reference])
-        def render(text,path):
+        def render(text,path,options=None):
+            if (options or {}).get("seed") is not None: torch.manual_seed(options["seed"])
             output=model.inference(text,"en",conditioning,embedding)
             sf.write(str(path),output["wav"],24000)
         return synthesize_lines(request,out,render)
