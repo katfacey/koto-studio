@@ -31,5 +31,5 @@ export function timingFix(p,l){
 }
 export function exportIssues(p){
   const muted=new Set(p.speakers.filter(s=>s.muted).map(s=>s.id));
-  return p.dialogue.flatMap((l,index)=>muted.has(l.speaker)?[]:!l.audio?[{line:l,index,reason:'No replacement voice take'}]:timingInfo(p,l).status==='long'?[{line:l,index,reason:timingInfo(p,l).label}]:[]);
+  return p.dialogue.flatMap((l,index)=>muted.has(l.speaker)?[]:!l.audio?[{line:l,index,type:'missing',reason:'No replacement voice take'}]:timingInfo(p,l).status==='long'?[{line:l,index,type:'timing',reason:timingInfo(p,l).label}]:[]);
 }

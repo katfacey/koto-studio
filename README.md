@@ -119,9 +119,14 @@ Export lists missing or overlong unmuted takes before rendering, with **Review c
 to jump to the affected line. **Fit with speech speed** enables modest auto-fit when
 possible. Otherwise **Extend slot** keeps the take and original reference timestamps,
 and extends only into a free gap within the video. This changes the English timing;
-review it against the picture. When there is no room, shorten the adaptation and
-regenerate, or adjust the clip manually. Export probes every take before mixing and
-reports line number, speaker, start time and the exact excess; it never cuts off speech.
+review it against the picture. Fixing overlong audio is recommended, but you can
+choose **Render anyway**.
+The renderer keeps each take's start time and plays its full audio, so voices can overlap.
+If dialogue continues beyond the source video, the export's audio duration extends
+past the video track. No timeline edits or extra speed changes are applied by this
+choice. Export probes every take and records line number, speaker, start time and
+exact excess under timing warnings in Jobs. Missing or outdated takes still need
+replacement audio before rendering.
 
 **Suggest alternatives** runs the selected local translation model for one clip.
 It proposes concise, near-target and fuller phrasings; it leaves your adaptation
@@ -182,8 +187,8 @@ default to Piper.
    Changing English text or voice configuration invalidates generated takes.
 8. **Export.** Choose separated background, original audio (which retains
    original dialogue), or silence. Export requires a replacement take for every
-   unmuted dialogue line. Modest time stretching is supported; overlong speech fails
-   validation rather than being cut off. MKV copies source video; MP4 encodes
+   unmuted dialogue line. Modest time stretching is supported; overlong speech is
+   flagged as a recommendation and can be rendered in full with **Render anyway**. MKV copies source video; MP4 encodes
    H.264. Both include English AAC and an optional English subtitle track. Download the
    video, mixed WAV, and SRT from Export or completed Jobs.
 

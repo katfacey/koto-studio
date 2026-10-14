@@ -236,6 +236,39 @@ def main():
                         page.keyboard.press('Backspace')
                         assert page.locator('.dialogue-clip').count()==count-1
                         page.keyboard.press('Control+z');save()
+                        # Render an actual overlong take through the warning UI, including its tail past video.
+                        source=Path(tmp)/'soft-export-source.mkv'
+                        subprocess.run([binary('ffmpeg'),'-v','error','-y','-f','lavfi','-i','color=c=black:s=160x90:r=24:d=2','-c:v','libx264',str(source)],check=True)
+                        created=page.request.post(f'{url}/api/projects',data={'name':'Timing warning validation'}).json()
+                        warning_pid=created['id']
+                        imported=page.request.post(f'{url}/api/projects/{warning_pid}/media',multipart={'file':{'name':source.name,'mimeType':'video/x-matroska','buffer':source.read_bytes()}})
+                        assert imported.ok,imported.text()
+                        current=imported.json()
+                        dialogue=[{'id':'warning-line','speaker':current['speakers'][0]['id'],'start':1.5,'end':1.6,'source':'','subtitle':'','translation':'Explicit PCM timing fixture.','audio':None,'auto_fit':False}]
+                        changed=page.request.patch(f'{url}/api/projects/{warning_pid}',data={'revision':current['revision'],'dialogue':dialogue,'settings':{**current['settings'],'background_mode':'silence'}})
+                        assert changed.ok,changed.text()
+                        attached=page.request.post(f'{url}/api/projects/{warning_pid}/dialogue/warning-line/audio',multipart={'file':{'name':take.name,'mimeType':'audio/wav','buffer':take.read_bytes()}})
+                        assert attached.ok,attached.text()
+                        page.evaluate('(pid)=>localStorage.setItem("koto-project",pid)',warning_pid)
+                        page.reload(wait_until='networkidle')
+                        page.locator('[data-act="export"]').click()
+                        assert 'Recommended: fix audio timing' in page.locator('.export-timing-warning').inner_text()
+                        render=page.get_by_role('button',name='Render anyway',exact=True)
+                        assert render.is_enabled()
+                        render.click()
+                        page.locator('.job-row.job-completed').wait_for(timeout=60000)
+                        assert 'timing warnings' in page.locator('.job-row.job-completed').inner_text()
+                        assert page.locator('.job-warnings').count()==1
+                        completed=page.request.get(f'{url}/api/projects/{warning_pid}/jobs').json()[0]
+                        assert completed['status']=='completed' and completed['result']['warnings']
+                        assert completed['result']['duration']>=3.5
+                        unchanged=page.request.get(f'{url}/api/projects/{warning_pid}').json()['dialogue'][0]
+                        assert unchanged['start']==1.5 and unchanged['end']==1.6
+                        download=page.locator('.job-row.job-completed a[download]')
+                        assert page.request.get(download.get_attribute('href')).ok
+                        # Return to the labeled sample for the editor screenshot and remaining queue check.
+                        page.evaluate('(pid)=>localStorage.setItem("koto-project",pid)',pid)
+                        page.reload(wait_until='networkidle')
                         page.locator(f'.speaker-card[data-id="{second}"]').click()
                         page.evaluate('document.fonts.ready')
                         page.screenshot(path=str(output / 'koto-editor.png'), full_page=True)
@@ -252,7 +285,7 @@ def main():
                         print('Browser diagnostic:', page.evaluate("({url:location.href,tracks:Array.from(document.querySelectorAll('[data-track]')).map(n=>({class:n.className,track:n.dataset.track,id:n.dataset.id})),errors:document.querySelector('.error-toast')?.textContent})"))
                         raise
                     browser.close()
-                print('Real Chromium checks passed: panel resizing, clip reassignment and retiming, lane ordering, mutes, visibility, original-reference selection, export timing preflight/fix, timing hints and suggestion selection, real live audio/mutes, autosave typing/trim races, real Piper generation/batching, English-mix completion, keyboard delete/undo, persistence, and Cancel X.')
+                print('Real Chromium checks passed: panel resizing, clip reassignment and retiming, lane ordering, mutes, visibility, original-reference selection, export timing warnings/render-anyway with full tail audio, preflight/fix, timing hints and suggestion selection, real live audio/mutes, autosave typing/trim races, real Piper generation/batching, English-mix completion, keyboard delete/undo, persistence, and Cancel X.')
             finally:
                 if server.poll() is None:
                     server.terminate()

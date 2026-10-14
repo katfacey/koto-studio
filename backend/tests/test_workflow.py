@@ -278,8 +278,8 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.p['dialogue'][0].update(auto_fit=False,playback_rate=1)
         await self.patch(dialogue=self.p['dialogue'])
         job=await self.client.post(f"/api/projects/{self.pid}/jobs",json={'kind':'export'})
-        failed=await self.wait_job(job.json()['id'],expected='failed')
-        self.assertIn('exceeds its slot',failed['message'])
+        completed=await self.wait_job(job.json()['id'])
+        self.assertIn('exceeds its slot',completed['result']['warnings'][0])
 
     async def test_validation_conflicts_and_generated_take_invalidation(self):
         await self.upload("media",self.video)
@@ -311,7 +311,7 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r.status_code,403)
         self.assertEqual((await self.client.get("/api/projects",headers={"Host":"malicious.example"})).status_code,400)
 
-    async def test_missing_takes_and_long_takes_fail_without_cutting_dialogue(self):
+    async def test_missing_takes_block_but_overlong_takes_render_with_warnings(self):
         await self.upload("media",self.video)
         await self.upload("subtitles",self.sub,{"language":"en"})
         r = await self.client.post(f"/api/projects/{self.pid}/jobs",json={"kind":"export"})
@@ -320,31 +320,77 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         for l in list(self.p["dialogue"]):await self.upload(f"dialogue/{l['id']}/audio",self.take)
         self.p["dialogue"][0]["end"]=.6
         await self.patch(dialogue=self.p["dialogue"],settings={**self.p["settings"],"background_mode":"silence"})
-        r = await self.client.post(f"/api/projects/{self.pid}/jobs",json={"kind":"export"})
-        j = await self.wait_job(r.json()["id"],"failed")
-        self.assertIn("will not cut off dialogue",j["message"])
-        self.assertIn("Line 1 (Speaker 01, 0.50s)",j["message"])
-        self.assertIn("0.80s speech at 1.00× / 0.10s slot (+0.70s)",j["message"])
-        root=self.app.state.store.project_dir(self.pid)
-        self.assertFalse(list(root.glob("*_mixclip_*.wav")))
-        # Filtering muted speakers must preserve the editor's line numbers.
+        unchanged=json.loads(json.dumps(self.p["dialogue"]))
+        j=await self.run_job("export")
+        self.assertIn("Complete with timing warnings",j["message"])
+        self.assertIn("Line 1 (Speaker 01, 0.50s)",j["result"]["warnings"][0])
+        self.assertIn("0.80s speech at 1.00× / 0.10s slot (+0.70s)",j["result"]["warnings"][0])
+        self.assertEqual(self.p["dialogue"],unchanged)
+        with wave.open(str(self.app.state.store.asset(self.pid,self.p['assets']['dub_audio']))) as w:
+            w.setpos(round(1.15*48000));self.assertTrue(any(w.readframes(2400)))
+        # Filtering muted speakers preserves the editor's line numbers.
         second={**self.p["speakers"][0],"id":"speaker-2","name":"Other actor","muted":False}
         self.p["speakers"][0]["muted"]=True
         self.p["speakers"].append(second)
         self.p["dialogue"][1].update(speaker="speaker-2",end=2.1)
         await self.patch(dialogue=self.p["dialogue"],speakers=self.p["speakers"])
-        r=await self.client.post(f"/api/projects/{self.pid}/jobs",json={"kind":"export"})
-        j=await self.wait_job(r.json()["id"],"failed")
-        self.assertIn("Line 2 (Other actor, 2.00s)",j["message"])
-        self.assertNotIn("Line 1",j["message"])
-        self.assertFalse(list(root.glob("*_mixclip_*.wav")))
-        # Explicitly extending a free slot retains the take and permits a real render.
+        j=await self.run_job("export")
+        self.assertEqual(len(j['result']['warnings']),1)
+        self.assertIn("Line 2 (Other actor, 2.00s)",j['result']['warnings'][0])
+        # Extending a free slot removes the recommendation while retaining the take.
         asset=self.p["dialogue"][1]["audio"]["asset"]
         self.p["dialogue"][1].update(source_start=2,source_end=2.1,end=2.8)
         await self.patch(dialogue=self.p["dialogue"])
-        await self.run_job("export")
+        j=await self.run_job("export")
+        self.assertEqual(j['result']['warnings'],[])
         self.assertEqual(self.p["dialogue"][1]["audio"]["asset"],asset)
         self.assertEqual(self.p["dialogue"][1]["source_end"],2.1)
+
+    async def test_overlong_takes_overlap_without_cutting_or_shifting_dialogue(self):
+        await self.upload('media',self.video)
+        await self.upload('subtitles',self.sub,{'language':'en'})
+        self.p['dialogue'][0].update(start=.5,end=.6,auto_fit=False)
+        self.p['dialogue'][1].update(start=1,end=1.1,auto_fit=False)
+        await self.patch(dialogue=self.p['dialogue'],settings={**self.p['settings'],'background_mode':'silence'})
+        for l in list(self.p['dialogue']):await self.upload(f"dialogue/{l['id']}/audio",self.take)
+        unchanged=json.loads(json.dumps(self.p['dialogue']))
+        j=await self.run_job('export')
+        self.assertEqual(len(j['result']['warnings']),2)
+        self.assertEqual(self.p['dialogue'],unchanged)
+        import array
+        with wave.open(str(self.app.state.store.asset(self.pid,j['result']['audio']))) as w:
+            def energy(at):
+                w.setpos(round(at*48000))
+                return sum(abs(x) for x in array.array('h',w.readframes(2400)))
+            single=energy(.8);overlap=energy(1.15);tail=energy(1.6)
+            self.assertGreater(single,0)
+            self.assertGreater(overlap,single*1.8)
+            self.assertAlmostEqual(tail/single,1,delta=.02)
+
+    async def test_dialogue_beyond_video_end_extends_full_audio_in_mkv_and_mp4(self):
+        await self.upload('media',self.video)
+        await self.upload('subtitles',self.sub,{'language':'en'})
+        self.p['dialogue']=self.p['dialogue'][:1]
+        self.p['dialogue'][0].update(start=3.7,end=3.9,auto_fit=False)
+        await self.patch(dialogue=self.p['dialogue'],settings={**self.p['settings'],'background_mode':'silence'})
+        await self.upload(f"dialogue/{self.p['dialogue'][0]['id']}/audio",self.take)
+        for container in ('mkv','mp4'):
+            with self.subTest(container=container):
+                await self.patch(settings={**self.p['settings'],'output':container})
+                unchanged=json.loads(json.dumps(self.p['dialogue']))
+                j=await self.run_job('export')
+                self.assertEqual(self.p['dialogue'],unchanged)
+                self.assertAlmostEqual(j['result']['duration'],4.5,delta=.001)
+                self.assertTrue(any('beyond the source video' in w for w in j['result']['warnings']))
+                with wave.open(str(self.app.state.store.asset(self.pid,j['result']['audio']))) as w:
+                    self.assertEqual(w.getnframes(),round(4.5*48000))
+                    w.setpos(round(4.4*48000));self.assertTrue(any(w.readframes(2400)))
+                rendered=self.app.state.store.asset(self.pid,j['result']['export'])
+                self.assertGreaterEqual(probe(rendered)['duration'],4.49)
+                # Check the muxed AAC too, rather than just the intermediate WAV.
+                tail=self.files/f'export-tail-{container}.wav'
+                subprocess.run([binary('ffmpeg'),'-v','error','-y','-ss','4.4','-i',str(rendered),'-map','0:a:0','-t','0.05',str(tail)],check=True)
+                with wave.open(str(tail)) as w:self.assertTrue(any(w.readframes(2400)))
 
     async def test_custom_worker_protocol_and_cancel(self):
         await self.upload("media",self.video)

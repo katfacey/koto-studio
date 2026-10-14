@@ -222,7 +222,8 @@ class Jobs:
                 self.store.job_update(jid,status="running",progress=0.01,message="Starting " + kind)
                 result = getattr(self, kind)(jid, spec["project"], spec["options"])
                 self.check(jid)
-                self.store.job_update(jid,status="completed",progress=1,message="Complete",result=result or {})
+                message = "Complete with timing warnings; recommended to fix audio before exporting" if kind=="export" and (result or {}).get("warnings") else "Complete"
+                self.store.job_update(jid,status="completed",progress=1,message=message,result=result or {})
             except Cancelled:
                 self.store.job_update(jid,status="cancelled",message="Cancelled; completed assets were preserved")
             except Exception as error:
@@ -541,10 +542,11 @@ class Jobs:
             rates[line["id"]] = rate
             if actual/rate > target+0.08:
                 issues.append(f"Line {index+1} ({speakers.get(line['speaker'],line['speaker'])}, {line['start']:.2f}s) exceeds its slot: {actual/rate:.2f}s speech at {rate:.2f}× / {target:.2f}s slot (+{actual/rate-target:.2f}s).")
-        if issues:
-            raise ValueError(" ".join(issues)+" Open Export to review the affected clips, fit speed or extend into a free gap; otherwise shorten the English wording and regenerate. Export will not cut off dialogue.")
         self.progress(jid,0.05,"Preparing synchronized dialogue clips")
         clips = []
+        import wave
+        frames = round(duration*48000)
+        source_frames = frames
         for i,line in enumerate(lines):
             self.check(jid)
             audio = line["audio"]
@@ -552,12 +554,17 @@ class Jobs:
             normalized = root / f"{jid[:8]}_mixclip_{i}.wav"
             filters = atempo_factor(rate) if abs(rate-1)>.001 else "anull"
             self.ffmpeg(jid,root,"-i",self.store.asset(project["id"],audio["asset"]),"-af",filters,"-ar","48000","-ac","2",normalized)
+            # Measure the normalized PCM itself: atempo can add a small tail.
+            # Size the mix for all speech, including takes beyond the source video.
+            with wave.open(str(normalized),"rb") as take:
+                frames = max(frames,round(line["start"]*48000)+take.getnframes())
             clips.append((line,normalized))
         self.progress(jid,0.25,"Mixing English dialogue and background")
         # Mix incrementally using PCM arrays to avoid FFmpeg's input limits on long episodes.
-        import wave
         import array
-        frames = round(duration*48000)
+        duration = frames/48000
+        if frames>source_frames:
+            issues.append(f"Export extended by {(frames-source_frames)/48000:.2f}s beyond the source video to keep the full dialogue audio.")
         mix_path = root / f"{jid[:8]}_dub.wav"
         # File-backed accumulation keeps memory bounded even for long episodes.
         import mmap
@@ -639,7 +646,7 @@ class Jobs:
             p["assets"]["english_subtitles"] = subtitle.name
             return p
         self.commit(jid,project["id"],merge,preserve_exports=True)
-        return {"export":target.name,"audio":mix_path.name,"subtitles":subtitle.name,"project_revision":project["revision"]}
+        return {"export":target.name,"audio":mix_path.name,"subtitles":subtitle.name,"project_revision":project["revision"],"warnings":issues,"duration":duration}
 
 
 def sys_byteorder_big():

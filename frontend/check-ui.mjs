@@ -117,13 +117,20 @@ assert.ok(root.innerHTML.includes('data-act="dub" class="active"'));
 assert.ok(nodes.get('#toast-root').innerHTML.includes('English mix selected'));
 await click('original');await timers[1]();assert.ok(root.innerHTML.includes('data-act="original" class="active"'));
 await click('tab',{tab:'Timeline'});await click('select-line',{id:'l1'});
-// An actual overlong take blocks render and offers a reversible, explicit fix.
+// An overlong take warns but allows rendering and offers a reversible, explicit fix.
 p.dialogue[0].audio={asset:'timing.wav',duration:3,kind:'imported'};p.revision++;
 await click('open-project',{id:p.id});await click('export');
 assert.ok(nodes.get('#modal-root').innerHTML.includes('Line 1 · Speaker 01'));
 assert.ok(nodes.get('#modal-root').innerHTML.includes('Review clip'));
 assert.ok(nodes.get('#modal-root').innerHTML.includes('Extend slot to 3.00s'));
-assert.match(nodes.get('#modal-root').innerHTML,/data-act="render"[^>]* disabled/);
+assert.doesNotMatch(nodes.get('#modal-root').innerHTML,/data-act="render"[^>]* disabled/);
+assert.ok(nodes.get('#modal-root').innerHTML.includes('Recommended: fix audio timing'));
+assert.ok(nodes.get('#modal-root').innerHTML.includes('Render anyway'));
+await click('render');assert.equal(jobs[0].kind,'export');assert.equal(jobs[0].status,'queued');
+jobs[0]={...jobs[0],status:'completed',progress:1,message:'Complete with timing warnings',result:{warnings:['Line 1 exceeds its slot <img src=x>'],export:'dub.mkv'}};
+await timers[1]();assert.ok(nodes.get('#toast-root').innerHTML.includes('Export complete with timing warnings'));
+assert.ok(root.innerHTML.includes('Timing warnings (1)'));assert.ok(root.innerHTML.includes('&lt;img src=x&gt;'));
+await click('export');
 await click('review-timing',{id:'l1'});assert.equal(nodes.get('#modal-root').innerHTML,'');
 assert.ok(root.innerHTML.includes('Extend slot to 3.00s'));
 await click('fix-timing',{id:'l1'});await click('save');
@@ -132,6 +139,11 @@ assert.equal(p.dialogue[0].audio.asset,'timing.wav');
 await click('export');assert.ok(!nodes.get('#modal-root').innerHTML.includes('export-issue'));
 await click('close-modal');await click('undo');await click('save');
 assert.equal(p.dialogue[0].end,3);assert.equal(p.dialogue[0].audio.asset,'timing.wav');
+// Missing takes remain a separate requirement; timing alone does not block.
+await click('add-line');await click('export');
+assert.match(nodes.get('#modal-root').innerHTML,/data-act="render"[^>]* disabled/);
+assert.ok(nodes.get('#modal-root').innerHTML.includes('needs replacement audio'));
+await click('close-modal');await click('undo');await click('save');
 await click('select-line',{id:'l1'});
 const press=(key,target={dataset:{},closest(){return null;}})=>{let prevented=false;keydown({key,target,preventDefault(){prevented=true;}});return prevented;};
 assert.equal(press('Delete',{dataset:{},closest(sel){return sel.includes('input,textarea')?{}:null;}}),false);
