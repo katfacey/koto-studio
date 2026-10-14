@@ -223,6 +223,12 @@ Coqui Public Model License. Review the relevant upstream terms when choosing a m
 
 [Prepared repository description and researched topics](docs/REPOSITORY.md)
 
+## License
+
+KOTO Studio's original source code is available under the [MIT License](LICENSE).
+Third-party dependencies, engines, and model weights retain their own licenses;
+the MIT license does not replace those upstream terms.
+
 ## Development credit
 
 KOTO Studio was developed with assistance from OpenAI’s ChatGPT/Codex, including
