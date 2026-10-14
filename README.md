@@ -244,6 +244,7 @@ chosen audition as a reference voice to maintain its identity across many lines.
 Workers and versioned model snapshots stay inside the app folder. The later GUI
 redesign can reuse the same library APIs.
 
+[Actual Windows voice-library screenshot](docs/images/voice-library-windows.png).
 See [voice setup, storage and API](docs/VOICES.md). DramaBox has been evaluated as
 an expressive future engine; it is not presented as a working built-in adapter
 without Windows/5090 validation. These additions are on `main`, not in the

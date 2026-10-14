@@ -50,6 +50,7 @@
   "docs/VOICES.md",
   "docs/images/editor-windows.png",
   "docs/images/separation-windows.png",
+  "docs/images/voice-library-windows.png",
   "frontend/check-layout.mjs",
   "frontend/check-separation.mjs",
   "frontend/check-timeline.mjs",

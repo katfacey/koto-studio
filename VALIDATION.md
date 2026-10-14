@@ -1,5 +1,34 @@
 # Validation · KOTO Studio
 
+## Development branch: character voice library and Qwen
+
+**[Windows voice-library validation passed](https://github.com/katfacey/koto-studio/actions/runs/38637758558).**
+This validates runtime commit `7fa562985094081e86701fea97cfab40dfe68a06`.
+The following documentation/image/manifest update does not change its runtime code.
+
+- All **48 backend tests** passed locally and on Windows, covering versioned
+  profile reuse across projects, copied sample independence, explicit version
+  adoption, clip overrides/fingerprints, retained takes and approved older-take export.
+- Chromium exercised real library creation/assignment, clip-only changes, saved
+  take selection, and version 2 remaining independent of a project's version 1.
+- **Real Qwen3-TTS Base CPU inference** generated a two-line reference-conditioned
+  batch; **VoiceDesign** generated an audition, then Base cloned that recording.
+  The installed-model path ran locally with Hugging Face offline mode and only
+  Windows system executables on PATH. No system SoX or FlashAttention build was used.
+- Real Piper/XTTS, all three separation models, standalone bootstrap/repair and
+  the existing editor/media/export checks also passed.
+- Local renderer/layout/timeline/comparison checks passed. A selected take made
+  for different text/voice settings displays a listening warning while remaining exportable.
+
+[Actual Windows library screenshot](docs/images/voice-library-windows.png) shows
+library version 2 alongside a project pinned to version 1. Its browser check used
+real Piper output; separate Qwen tests used the actual downloaded Qwen weights.
+
+These are CPU integration tests. RTX 5090 performance, voice similarity and
+Japanese/Chinese reference quality still require target-machine listening/testing.
+DramaBox was evaluated from upstream sources; no DramaBox GPU inference or working
+built-in adapter is claimed. See [voice setup and evaluation](docs/VOICES.md).
+
 ## Development branch: UVR-style separation
 
 **[Windows separation validation passed](https://github.com/katfacey/koto-studio/actions/runs/38632810248).**
